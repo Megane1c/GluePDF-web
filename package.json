@@ -15,6 +15,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@types/react-dnd": "^2.0.36",
     "axios": "^1.8.4",
+    "pdf-lib": "^1.17.1",
     "react": "^19.0.0",
     "react-dnd": "^16.0.1",
     "react-dnd-html5-backend": "^16.0.1",

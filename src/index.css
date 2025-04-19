@@ -213,4 +213,23 @@ button:focus-visible {
 .button-disabled {
   pointer-events: none;
   opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.remove-button-container {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 10;
+  cursor: pointer;
+}
+
+.pdf-item {
+  position: relative;
+}
+
+.file-content:not(.disable-grab) {
+  cursor: grab;
+  width: 100%;
+  padding-top: 12px;
 }

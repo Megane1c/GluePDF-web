@@ -2,11 +2,11 @@ import { useMemo } from 'react';
 import { useSortable, SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { FiFile, FiTrash } from 'react-icons/fi';
-import { UploadedFile } from '../services/api';
+import { PDFFile } from '../services/pdf';
 
 interface PDFItemProps {
-    file: UploadedFile;
-    onRemove: (filename: string) => void;
+    file: PDFFile;
+    onRemove: (id: string) => void;
     disabled?: boolean;
 }
 
@@ -25,7 +25,7 @@ function truncateFilename(filename: string, maxLength = 20): { name: string; ext
     };
 }
 
-const PDFItem = ({ file, onRemove , disabled }: PDFItemProps) => {
+const PDFItem = ({ file, onRemove, disabled }: PDFItemProps) => {
     const {
         attributes,
         listeners,
@@ -34,7 +34,7 @@ const PDFItem = ({ file, onRemove , disabled }: PDFItemProps) => {
         transition,
         isDragging
     } = useSortable({
-        id: file.filename,
+        id: file.id,
         resizeObserverConfig: undefined,
         disabled: disabled,
     });
@@ -62,38 +62,36 @@ const PDFItem = ({ file, onRemove , disabled }: PDFItemProps) => {
         return `${mb.toFixed(1)} MB`;
     };
 
-    // Extract the original filename by removing the UUID prefix
-    const displayName = (() => {
-        const dashIndex = file.filename.split('-').length > 4 
-            ? file.filename.split('-', 5).join('-').length
-            : -1;
-        
-        return dashIndex > 0 
-            ? file.filename.slice(dashIndex + 1) 
-            : file.filename;
-    })();
+    const { name, ext } = truncateFilename(file.name);
 
-    const { name, ext } = truncateFilename(displayName);
+    const handleRemove = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!disabled) {
+            onRemove(file.id);
+        }
+    };
     
     return (
         <div
             ref={setNodeRef}
             style={style}
-            {...attributes}
-            {...(disabled ? {} : listeners)}
             className={`pdf-item ${disabled ? 'pdf-item-disabled' : ''}`}
         >
-            <button
-                onClick={() => onRemove(file.filename)}
-                title="Remove file"
-                disabled={disabled}
-                className={`${disabled ? 'button-disabled' : ''}`}
+            <div className={`remove-button-container ${disabled ? 'button-disabled' : ''}`} onClick={handleRemove}>
+                <button
+                    disabled={disabled}
+                >
+                    <FiTrash size={16} className="remove-button" />
+                </button>
+            </div>
+
+            <div 
+                className={`file-content ${disabled ? 'disable-grab' : ''}`}
+                {...attributes}
+                {...(disabled ? {} : listeners)}
             >
-                <FiTrash size={16} className="remove-button" />
-            </button>
-            <div className="file-content">
                 <FiFile size={20} />
-                <div className="file-name" title={displayName}>
+                <div className="file-name" title={file.name}>
                     <span>{name}</span>
                     <span className="file-ext">{ext}</span>
                 </div>
@@ -106,20 +104,20 @@ const PDFItem = ({ file, onRemove , disabled }: PDFItemProps) => {
 };
 
 interface PDFListProps {
-    files: UploadedFile[];
-    onReorder: (files: UploadedFile[]) => void;
-    onRemove: (filename: string) => void;
+    files: PDFFile[];
+    onReorder: (files: PDFFile[]) => void;
+    onRemove: (id: string) => void;
     disabled?: boolean;
 }
 
-const PDFList = ({ files, onRemove , disabled}: PDFListProps) => {
-    const items = useMemo(() => files.map(file => file.filename), [files]);
+const PDFList = ({ files, onRemove, disabled }: PDFListProps) => {
+    const items = useMemo(() => files.map(file => file.id), [files]);
 
     return (
         <SortableContext items={items} strategy={horizontalListSortingStrategy}>
             {files.map((file) => (
                 <PDFItem
-                    key={file.filename}
+                    key={file.id}
                     file={file}
                     onRemove={onRemove}
                     disabled={disabled}
