@@ -55,7 +55,6 @@ const PDFMerger = () => {
     const { getRootProps, getInputProps } = useDropzone({
         onDrop,
         accept: { 'application/pdf': ['.pdf'] },
-        noClick: files.length > 0,
         disabled: isProcessingComplete,
         onDragEnter: () => setIsDragActive(true),
         onDragLeave: () => setIsDragActive(false),
@@ -205,7 +204,7 @@ const PDFMerger = () => {
                                             />
                                         </div>
                                         <p className="dropzone-hint">
-                                            You can drag more files here or rearrange the order
+                                            You can add more files here or rearrange the order
                                         </p>
                                     </div>
                                 ) : (
