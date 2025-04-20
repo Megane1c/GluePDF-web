@@ -9,10 +9,8 @@ import PDFList from './PDFList';
 const PDFMerger = () => {
     const [files, setFiles] = useState<PDFFile[]>([]);
     const [loading, setLoading] = useState(false);
-    const [mergedPdfUrl, setMergedPdfUrl] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [isDragActive, setIsDragActive] = useState(false);
-    const [isProcessingComplete, setIsProcessingComplete] = useState(false);
 
     const sensors = useSensors(
         useSensor(MouseSensor),
@@ -28,15 +26,6 @@ const PDFMerger = () => {
             return () => clearTimeout(timer); // cleanup if component unmounts early
         }
     }, [error]);
-
-    // Cleanup URL objects when component unmounts
-    useEffect(() => {
-        return () => {
-            if (mergedPdfUrl) {
-                URL.revokeObjectURL(mergedPdfUrl);
-            }
-        };
-    }, [mergedPdfUrl]);
 
     const onDrop = useCallback(async (acceptedFiles: File[]) => {
         setLoading(true);
@@ -55,7 +44,6 @@ const PDFMerger = () => {
     const { getRootProps, getInputProps } = useDropzone({
         onDrop,
         accept: { 'application/pdf': ['.pdf'] },
-        disabled: isProcessingComplete,
         onDragEnter: () => setIsDragActive(true),
         onDragLeave: () => setIsDragActive(false),
         onDropAccepted: () => setIsDragActive(false),
@@ -63,11 +51,6 @@ const PDFMerger = () => {
     });
 
     const handleRemoveFile = (id: string) => {
-        // // If processing is complete, don't allow removal
-        if (isProcessingComplete) {
-            return;
-        }
-
         pdfService.removeFile(id);
         setFiles(prev => prev.filter(file => file.id !== id));
     };
@@ -78,11 +61,6 @@ const PDFMerger = () => {
     };
 
     const handleDragEnd = (event: DragEndEvent) => {
-        // If processing is complete, don't allow reordering
-        if (isProcessingComplete) {
-            return;
-        }
-
         const { active, over } = event;
         
         if (over && active.id !== over.id) {
@@ -96,7 +74,7 @@ const PDFMerger = () => {
         }
     };
 
-    const handleMerge = async () => {
+    const handleMergeAndDownload = async () => {
         if (files.length < 2) {
             setError('Please upload at least 2 files to merge');
             return;
@@ -113,21 +91,9 @@ const PDFMerger = () => {
             // Create a URL for the Blob
             const url = URL.createObjectURL(blob);
             
-            // Set the URL for download
-            setMergedPdfUrl(url);
-            setIsProcessingComplete(true);
-        } catch (err) {
-            setError('Failed to merge files');
-            console.error(err);
-        }
-        setLoading(false);
-    };
-
-    const handleDownload = () => {
-        if (mergedPdfUrl) {
-            // Create a temporary anchor element
+            // Create a temporary anchor element and trigger download
             const link = document.createElement('a');
-            link.href = mergedPdfUrl;
+            link.href = url;
             link.download = 'glued-doc.pdf';
             
             // Append to body, click, and remove
@@ -135,24 +101,19 @@ const PDFMerger = () => {
             link.click();
             document.body.removeChild(link);
             
-            // Reset the application state after download
-            setTimeout(() => {
-                handleClearAll();
-            }, 100); // Small timeout to ensure download starts before resetting
+            // Clean up the URL object
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            setError('Failed to merge files');
+            console.error(err);
         }
+        setLoading(false);
     };
 
     const handleClearAll = () => {
         // Clear files
         files.forEach(file => pdfService.removeFile(file.id));
         setFiles([]);
-        
-        // Reset state
-        if (mergedPdfUrl) {
-            URL.revokeObjectURL(mergedPdfUrl);
-            setMergedPdfUrl(null);
-        }
-        setIsProcessingComplete(false);
     };
 
     return (
@@ -170,7 +131,7 @@ const PDFMerger = () => {
                     <div className="header-section">
                         <div className="header-content">
                             <h1 className="title">Glue PDF</h1>
-                            {files.length > 0 && !loading && !isProcessingComplete && (
+                            {files.length > 0 && !loading && (
                                 <button
                                     onClick={handleClearAll}
                                     id="clear-button"
@@ -183,14 +144,14 @@ const PDFMerger = () => {
                     </div>
     
                     <div {...getRootProps()} 
-                        className={`dropzone-section ${isDragActive ? 'drag-active' : ''} ${isProcessingComplete ? 'dropzone-disabled' : ''}`}>
+                        className={`dropzone-section ${isDragActive ? 'drag-active' : ''}`}>
                         <DndContext
                             sensors={sensors}
                             collisionDetection={closestCenter}
                             onDragEnd={handleDragEnd}
                         >
                             <div
-                                className={`dropzone ${files.length > 0 ? 'compact' : 'spacious'} ${isProcessingComplete ? 'dropzone-disabled' : ''}`}
+                                className={`dropzone ${files.length > 0 ? 'compact' : 'spacious'}`}
                             >
                                 <input {...getInputProps()} />
                                 {files.length > 0 ? (
@@ -200,7 +161,7 @@ const PDFMerger = () => {
                                                 files={files} 
                                                 onReorder={handleReorder}
                                                 onRemove={handleRemoveFile}
-                                                disabled={isProcessingComplete}
+                                                disabled={false}
                                             />
                                         </div>
                                         <p className="dropzone-hint">
@@ -220,23 +181,14 @@ const PDFMerger = () => {
                     {files.length > 0 && (
                         <div className="action-section">
                             <div className="action-buttons">
-                                {mergedPdfUrl ? (
-                                    <button
-                                        onClick={handleDownload}
-                                        className="download-button"
-                                    >
-                                        <FiDownload className="button-icon" />
-                                        Download Merged PDF
-                                    </button>
-                                ) : (
-                                    <button
-                                        onClick={handleMerge}
-                                        disabled={files.length < 2 || loading}
-                                        className="merge-button"
-                                    >
-                                        {loading ? 'Processing...' : 'Merge PDFs'}
-                                    </button>
-                                )}
+                                <button
+                                    onClick={handleMergeAndDownload}
+                                    disabled={files.length < 2 || loading}
+                                    className="merge-button"
+                                >
+                                    <FiDownload className="button-icon" />
+                                    {loading ? 'Processing...' : 'Merge PDFs'}
+                                </button>
                             </div>
                         </div>
                     )}

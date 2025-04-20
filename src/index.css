@@ -129,7 +129,7 @@ button:focus-visible {
   border-color: #3b82f6;
 }
 
-.dropzone-section:not(.dropzone-disabled):hover {
+.dropzone-section:hover {
   border-color: #3b82f6;
 }
 
@@ -199,23 +199,6 @@ button:focus-visible {
   color: #bbb;
 }
 
-.dropzone-disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  background-color: #5c5a5a;
-}
-
-.pdf-item-disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.button-disabled {
-  pointer-events: none;
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
 .remove-button-container {
   position: absolute;
   top: 8px;
@@ -228,7 +211,7 @@ button:focus-visible {
   position: relative;
 }
 
-.file-content:not(.disable-grab) {
+.file-content {
   cursor: grab;
   width: 100%;
   padding-top: 12px;
