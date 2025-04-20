@@ -150,7 +150,7 @@ button:focus-visible {
   padding-right: 1rem;
 }
 
-.remove-button {
+.remove-button, .remove-all-button {
   background: none;
   color: #ff6b6b;
   border: none;
@@ -272,9 +272,25 @@ button:focus-visible {
   cursor: not-allowed;
 }
 
-.upload-icon-small {
+button:disabled .remove-all-button {
+  opacity: 0.7; 
+}
+
+.upload-icon-small, .button-icon {
   margin-right: 8px;
-  vertical-align: middle;
+}
+
+.clear-button {
+  display: inline-flex;  
+  align-items: center;  
+  justify-content: center;
+  gap: 0.5rem;           
+}
+
+.merger-steps {
+  padding-left: 1.5rem;
+  line-height: 1.6;
+  text-align: left;
 }
 
 @keyframes spin {
