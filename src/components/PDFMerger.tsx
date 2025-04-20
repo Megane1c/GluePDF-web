@@ -2,13 +2,14 @@ import { useState, useEffect, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { DndContext, DragEndEvent, closestCenter, MouseSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
-import { FiUpload, FiTrash2, FiDownload } from 'react-icons/fi';
+import { FiUpload, FiTrash2, FiLoader, FiDownload } from 'react-icons/fi';
 import { pdfService, PDFFile } from '../services/pdf';
 import PDFList from './PDFList';
 
 const PDFMerger = () => {
     const [files, setFiles] = useState<PDFFile[]>([]);
     const [loading, setLoading] = useState(false);
+    const [fileProcessing, setFileProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isDragActive, setIsDragActive] = useState(false);
 
@@ -28,7 +29,9 @@ const PDFMerger = () => {
     }, [error]);
 
     const onDrop = useCallback(async (acceptedFiles: File[]) => {
-        setLoading(true);
+        if (acceptedFiles.length === 0) return;
+        
+        setFileProcessing(true); // Start file processing loading state
         setError('');
         try {
             const pdfFiles = await Promise.all(
@@ -37,8 +40,9 @@ const PDFMerger = () => {
             setFiles(prev => [...prev, ...pdfFiles]);
         } catch (err) {
             setError('Failed to process one or more files. Make sure all files are valid PDFs.');
+        } finally {
+            setFileProcessing(false); // End file processing loading state
         }
-        setLoading(false);
     }, []);
 
     const { getRootProps, getInputProps } = useDropzone({
@@ -48,6 +52,7 @@ const PDFMerger = () => {
         onDragLeave: () => setIsDragActive(false),
         onDropAccepted: () => setIsDragActive(false),
         onDropRejected: () => setIsDragActive(false),
+        disabled: fileProcessing, // Disable dropzone while processing files
     });
 
     const handleRemoveFile = (id: string) => {
@@ -143,29 +148,39 @@ const PDFMerger = () => {
                         </div>
                     </div>
     
-                    <div {...getRootProps()} 
-                        className={`dropzone-section ${isDragActive ? 'drag-active' : ''}`}>
-                        <DndContext
-                            sensors={sensors}
-                            collisionDetection={closestCenter}
-                            onDragEnd={handleDragEnd}
-                        >
-                            <div
-                                className={`dropzone ${files.length > 0 ? 'compact' : 'spacious'}`}
+                    <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={handleDragEnd}
+                    >
+                        <div className="dropzone-section">
+                            {/* Display files */}
+                            {files.length > 0 && (
+                                <div className="existing-files-container">
+                                    <PDFList 
+                                        files={files} 
+                                        onReorder={handleReorder}
+                                        onRemove={handleRemoveFile}
+                                    />
+                                </div>
+                            )}
+                            
+                            {/* Dropzone area */}
+                            <div 
+                                {...getRootProps()} 
+                                className={`dropzone-area ${isDragActive ? 'drag-active' : ''} ${fileProcessing ? 'processing' : ''}`}
                             >
                                 <input {...getInputProps()} />
-                                {files.length > 0 ? (
+                                {fileProcessing ? (
+                                    <div className="dropzone-loading">
+                                        <FiLoader className="loading-icon" />
+                                        <p className="loading-text">Processing files...</p>
+                                    </div>
+                                ) : files.length > 0 ? (
                                     <div className="dropzone-content">
-                                        <div className="file-list-container">
-                                            <PDFList 
-                                                files={files} 
-                                                onReorder={handleReorder}
-                                                onRemove={handleRemoveFile}
-                                                disabled={false}
-                                            />
-                                        </div>
                                         <p className="dropzone-hint">
-                                            You can add more files here or rearrange the order
+                                            <FiUpload className="upload-icon-small" />
+                                            Drop more files here or click to browse
                                         </p>
                                     </div>
                                 ) : (
@@ -175,8 +190,8 @@ const PDFMerger = () => {
                                     </div>
                                 )}
                             </div>
-                        </DndContext>
-                    </div>
+                        </div>
+                    </DndContext>
     
                     {files.length > 0 && (
                         <div className="action-section">

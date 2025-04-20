@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useSortable, SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable';
+import { useSortable, SortableContext, rectSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { FiFile, FiTrash } from 'react-icons/fi';
 import { PDFFile } from '../services/pdf';
@@ -25,7 +25,7 @@ function truncateFilename(filename: string, maxLength = 20): { name: string; ext
     };
 }
 
-const PDFItem = ({ file, onRemove, disabled }: PDFItemProps) => {
+const PDFItem = ({ file, onRemove }: PDFItemProps) => {
     const {
         attributes,
         listeners,
@@ -36,7 +36,7 @@ const PDFItem = ({ file, onRemove, disabled }: PDFItemProps) => {
     } = useSortable({
         id: file.id,
         resizeObserverConfig: undefined,
-        disabled: disabled,
+        disabled: false,
     });
 
     const style = {
@@ -51,7 +51,9 @@ const PDFItem = ({ file, onRemove, disabled }: PDFItemProps) => {
         backgroundColor: '#1a1a1a',
         borderRadius: '10px',
         padding: '12px',
-        gap: '10px'
+        gap: '10px',
+        position: 'relative' as const,
+        zIndex: isDragging ? 999 : 1
     };
 
     const formatFileSize = (bytes: number) => {
@@ -66,29 +68,27 @@ const PDFItem = ({ file, onRemove, disabled }: PDFItemProps) => {
 
     const handleRemove = (e: React.MouseEvent) => {
         e.stopPropagation();
-        if (!disabled) {
-            onRemove(file.id);
-        }
+        onRemove(file.id);
+        
     };
     
     return (
         <div
             ref={setNodeRef}
             style={style}
-            className={`pdf-item ${disabled ? 'pdf-item-disabled' : ''}`}
+            className="pdf-item"
         >
-            <div className={`remove-button-container ${disabled ? 'button-disabled' : ''}`} onClick={handleRemove}>
+            <div className="remove-button-container" onClick={handleRemove}>
                 <button
-                    disabled={disabled}
                 >
                     <FiTrash size={16} className="remove-button" />
                 </button>
             </div>
 
             <div 
-                className={`file-content ${disabled ? 'disable-grab' : ''}`}
+                className="file-content"
                 {...attributes}
-                {...(disabled ? {} : listeners)}
+                {...listeners}
             >
                 <FiFile size={20} />
                 <div className="file-name" title={file.name}>
@@ -114,16 +114,18 @@ const PDFList = ({ files, onRemove, disabled }: PDFListProps) => {
     const items = useMemo(() => files.map(file => file.id), [files]);
 
     return (
-        <SortableContext items={items} strategy={horizontalListSortingStrategy}>
-            {files.map((file) => (
-                <PDFItem
-                    key={file.id}
-                    file={file}
-                    onRemove={onRemove}
-                    disabled={disabled}
-                />
-            ))}
-        </SortableContext>
+        <div className="pdf-list-container">
+            <SortableContext items={items} strategy={rectSortingStrategy}>
+                {files.map((file) => (
+                    <PDFItem
+                        key={file.id}
+                        file={file}
+                        onRemove={onRemove}
+                        disabled={disabled}
+                    />
+                ))}
+            </SortableContext>
+        </div>
     );
 };
 
