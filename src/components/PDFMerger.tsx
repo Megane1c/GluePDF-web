@@ -139,7 +139,8 @@ const PDFMerger = () => {
                             {files.length > 0 && !loading && (
                                 <button
                                     onClick={handleClearAll}
-                                    id="clear-button"
+                                    disabled={fileProcessing}
+                                    className="clear-button"
                                 >
                                     <FiTrash2 className="remove-button" />
                                     Clear All
@@ -198,7 +199,7 @@ const PDFMerger = () => {
                             <div className="action-buttons">
                                 <button
                                     onClick={handleMergeAndDownload}
-                                    disabled={files.length < 2 || loading}
+                                    disabled={files.length < 2 || loading || fileProcessing}
                                     className="merge-button"
                                 >
                                     <FiDownload className="button-icon" />
