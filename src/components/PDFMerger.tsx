@@ -130,18 +130,29 @@ const PDFMerger = () => {
                     </div>
                 </div>
             )}
-    
+
             <div className="pdf-merger-container">
                 <div className="pdf-box">
                     <div className="header-section">
                         <div className="header-content">
                             <h1 className="title">Glue PDF</h1>
-                            {files.length > 0 && !loading && (
+                            <p>Merge PDFs securely in your browser — no server, no uploads.</p>
+                            {files.length === 0 && (
+                                <div className="merger-steps">
+                                    <ol>
+                                        <li><strong>Select PDFs</strong> (drag & drop or click)</li>
+                                        <li><strong>Reorder</strong> (<i>optional</i> — drag files to change order)</li>
+                                        <li><strong>Merge & Download</strong> (instant client-side processing)</li>
+                                    </ol>
+                                </div>
+                            )}
+                            {files.length > 0 && (
                                 <button
                                     onClick={handleClearAll}
-                                    id="clear-button"
+                                    disabled={files.length < 2 || fileProcessing || loading}
+                                    className="clear-button"
                                 >
-                                    <FiTrash2 className="remove-button" />
+                                    <FiTrash2 className="remove-all-button" />
                                     Clear All
                                 </button>
                             )}
@@ -177,7 +188,7 @@ const PDFMerger = () => {
                                         <p className="loading-text">Processing files...</p>
                                     </div>
                                 ) : files.length > 0 ? (
-                                    <div className="dropzone-content">
+                                    <div className={`dropzone-content ${isDragActive ? 'drag-active' : ''}`}>
                                         <p className="dropzone-hint">
                                             <FiUpload className="upload-icon-small" />
                                             Drop more files here or click to browse
@@ -185,7 +196,7 @@ const PDFMerger = () => {
                                     </div>
                                 ) : (
                                     <div className="dropzone-empty">
-                                        <FiUpload className="upload-icon" />
+                                        <FiUpload className="upload-icon-small" />
                                         <p className="upload-text">Drag and drop PDFs here, or click to browse</p>
                                     </div>
                                 )}
@@ -195,10 +206,10 @@ const PDFMerger = () => {
     
                     {files.length > 0 && (
                         <div className="action-section">
-                            <div className="action-buttons">
+                            <div className="merge-download">
                                 <button
                                     onClick={handleMergeAndDownload}
-                                    disabled={files.length < 2 || loading}
+                                    disabled={files.length < 2 || loading || fileProcessing}
                                     className="merge-button"
                                 >
                                     <FiDownload className="button-icon" />
