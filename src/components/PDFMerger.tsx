@@ -9,7 +9,7 @@ import PDFList from './PDFList';
 const PDFMerger = () => {
     const [files, setFiles] = useState<PDFFile[]>([]);
     const [loading, setLoading] = useState(false);
-    const [fileProcessing, setFileProcessing] = useState(false); // New state for file processing
+    const [fileProcessing, setFileProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isDragActive, setIsDragActive] = useState(false);
 
@@ -148,15 +148,27 @@ const PDFMerger = () => {
                         </div>
                     </div>
     
-                    <div {...getRootProps()} 
-                        className={`dropzone-section ${isDragActive ? 'drag-active' : ''} ${fileProcessing ? 'processing' : ''}`}>
-                        <DndContext
-                            sensors={sensors}
-                            collisionDetection={closestCenter}
-                            onDragEnd={handleDragEnd}
-                        >
-                            <div
-                                className={`dropzone ${files.length > 0 ? 'compact' : 'spacious'}`}
+                    <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={handleDragEnd}
+                    >
+                        <div className="dropzone-section">
+                            {/* Display files */}
+                            {files.length > 0 && (
+                                <div className="existing-files-container">
+                                    <PDFList 
+                                        files={files} 
+                                        onReorder={handleReorder}
+                                        onRemove={handleRemoveFile}
+                                    />
+                                </div>
+                            )}
+                            
+                            {/* Dropzone area */}
+                            <div 
+                                {...getRootProps()} 
+                                className={`dropzone-area ${isDragActive ? 'drag-active' : ''} ${fileProcessing ? 'processing' : ''}`}
                             >
                                 <input {...getInputProps()} />
                                 {fileProcessing ? (
@@ -166,16 +178,9 @@ const PDFMerger = () => {
                                     </div>
                                 ) : files.length > 0 ? (
                                     <div className="dropzone-content">
-                                        <div className="file-list-container">
-                                            <PDFList 
-                                                files={files} 
-                                                onReorder={handleReorder}
-                                                onRemove={handleRemoveFile}
-                                                disabled={false}
-                                            />
-                                        </div>
                                         <p className="dropzone-hint">
-                                            You can add more files here or rearrange the order
+                                            <FiUpload className="upload-icon-small" />
+                                            Drop more files here or click to browse
                                         </p>
                                     </div>
                                 ) : (
@@ -185,8 +190,8 @@ const PDFMerger = () => {
                                     </div>
                                 )}
                             </div>
-                        </DndContext>
-                    </div>
+                        </div>
+                    </DndContext>
     
                     {files.length > 0 && (
                         <div className="action-section">
