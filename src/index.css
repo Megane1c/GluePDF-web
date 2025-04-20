@@ -116,7 +116,6 @@ button:focus-visible {
   border-radius: 0.5rem;
   background-color: #383838;
   transition: all 0.2s ease;
-  cursor: pointer;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -226,7 +225,6 @@ button:focus-visible {
   display: flex;
   flex-direction: row;
   align-items: center;
-  justify-content: center;
   height: 100%;
   width: 100%;
   padding: 2rem;
