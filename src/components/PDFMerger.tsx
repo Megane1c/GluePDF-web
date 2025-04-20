@@ -177,7 +177,7 @@ const PDFMerger = () => {
                                         <p className="loading-text">Processing files...</p>
                                     </div>
                                 ) : files.length > 0 ? (
-                                    <div className="dropzone-content">
+                                    <div className={`dropzone-content ${isDragActive ? 'drag-active' : ''}`}>
                                         <p className="dropzone-hint">
                                             <FiUpload className="upload-icon-small" />
                                             Drop more files here or click to browse
