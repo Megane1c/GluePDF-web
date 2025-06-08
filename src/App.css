@@ -40,3 +40,54 @@
 .read-the-docs {
   color: #888;
 }
+
+.menu-header {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  margin: 2rem 0;
+}
+.menu-btn {
+  flex: 1 1 0;
+  min-width: 100px;
+  max-width: 130px;
+  padding: 0.6rem 1rem;
+  font-size: 1rem;
+  border: none;
+  background: #e5e7eb;
+  color: #111827;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  outline: none;
+  box-shadow: none;
+  text-align: center;
+  font-weight: 500;
+}
+.menu-btn:focus {
+  outline: none;
+  box-shadow: none;
+}
+.menu-btn.active {
+  background: #2563eb;
+  color: #fff;
+  font-weight: 600;
+  position: relative;
+}
+.menu-btn.active:hover {
+  background: #1d4ed8;
+}
+.menu-btn:not(.active):hover {
+  background: #d1d5db;
+}
+.menu-btn.active::after {
+  content: '';
+  display: block;
+  position: absolute;
+  left: 20%;
+  right: 20%;
+  bottom: -6px;
+  height: 4px;
+  border-radius: 2px;
+  background: #fff;
+}
