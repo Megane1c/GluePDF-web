@@ -85,13 +85,13 @@ const PDFSigner: React.FC = () => {
   };
 
   // Drag logic for signature overlay
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
-    if ((e.target as HTMLElement).dataset.handle) return;
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {    if ((e.target as HTMLElement).dataset.handle) return;
     setDragging(true);
     const overlayRect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    // Always grab from the center of the signature
     setOffset({
-      x: e.clientX - overlayRect.left,
-      y: e.clientY - overlayRect.top
+      x: overlayRect.width / 2,
+      y: overlayRect.height / 2
     });
     e.stopPropagation();
     window.addEventListener('mousemove', handleGlobalMouseMove);
@@ -164,24 +164,47 @@ const PDFSigner: React.FC = () => {
     window.addEventListener('mouseup', up);
   };
 
-  // Rotation handle
+  // Adjust rotation logic to ensure proper alignment
   const handleOverlayRotate = (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
     e.stopPropagation();
     e.preventDefault();
     const rect = e.currentTarget.parentElement?.getBoundingClientRect();
     if (!rect) return;
+
+    // Calculate the center of the signature overlay
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
+
+    const startAngle = sigRotation;
+    const startMouseAngle = Math.atan2(
+      e.clientY - centerY,
+      e.clientX - centerX
+    ) * (180 / Math.PI);
+
     const move = (moveEvent: MouseEvent) => {
       const dx = moveEvent.clientX - centerX;
       const dy = moveEvent.clientY - centerY;
-      const angle = Math.atan2(dy, dx) * 180 / Math.PI;
-      setSigRotation(angle);
+      const currentMouseAngle = Math.atan2(dy, dx) * (180 / Math.PI);
+      const deltaAngle = currentMouseAngle - startMouseAngle;
+
+      // Update rotation while keeping it between 0 and 360 degrees
+      let newRotation = (startAngle + deltaAngle) % 360;
+      if (newRotation < 0) newRotation += 360;
+
+      setSigRotation(newRotation);
+
+      // Update the transform origin to ensure rotation is around the center
+      const overlay = e.currentTarget.parentElement as HTMLElement;
+      if (overlay) {
+        overlay.style.transformOrigin = "center center";
+      }
     };
+
     const up = () => {
       window.removeEventListener('mousemove', move);
       window.removeEventListener('mouseup', up);
     };
+
     window.addEventListener('mousemove', move);
     window.addEventListener('mouseup', up);
   };
@@ -211,19 +234,27 @@ const PDFSigner: React.FC = () => {
     const signatureWidth = sigSize * scaleX;
     const signatureHeight = (sigSize * (img.height / img.width)) * scaleY;
 
-    // Calculate position in PDF coordinates (origin at bottom-left)
-    // For rotation, we need to center the signature around its pivot point
-    const centerX = sigPos.x * scaleX + signatureWidth / 2;
-    const centerY = pdfHeight - (sigPos.y * scaleY + signatureHeight / 2);
+    // Calculate top-left in PDF coordinates
+    const pdfX = sigPos.x * scaleX;
+    const pdfY = pdfHeight - (sigPos.y * scaleY) - signatureHeight;
+
+    let drawX = pdfX;
+    let drawY = pdfY;
+    if (sigRotation !== 0) {
+      // Move anchor to center, rotate, then move back
+      const cx = pdfX + signatureWidth / 2;
+      const cy = pdfY + signatureHeight / 2;
+      const rad = (-sigRotation * Math.PI) / 180;
+      drawX = cx + (-signatureWidth / 2) * Math.cos(rad) - (-signatureHeight / 2) * Math.sin(rad);
+      drawY = cy + (-signatureWidth / 2) * Math.sin(rad) + (-signatureHeight / 2) * Math.cos(rad);
+    }
 
     page.drawImage(img, {
-      x: centerX - signatureWidth / 2,
-      y: centerY - signatureHeight / 2,
+      x: drawX,
+      y: drawY,
       width: signatureWidth,
       height: signatureHeight,
-      rotate: degrees(sigRotation),
-      xSkew: degrees(0),
-      ySkew: degrees(0)
+      rotate: degrees(-sigRotation)
     });
 
     const out = await pdfDoc.saveAsBase64({ dataUri: true });
