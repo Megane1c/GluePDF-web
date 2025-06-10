@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import PDFMerger from './components/PDFMerger';
 import PDFSigner from './components/PDFSigner';
 import './App.css';
