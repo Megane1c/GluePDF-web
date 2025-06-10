@@ -14,13 +14,17 @@ const PDFSigner: React.FC = () => {
   const [dragging, setDragging] = useState(false);
   const [pageCanvases, setPageCanvases] = useState<Array<HTMLCanvasElement | null>>([]);
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [sigSize, setSigSize] = useState<number>(120); // width in px
+  const [sigSize, setSigSize] = useState<number>(120);
   const [placing, setPlacing] = useState(false);
+  const [showDropOverlay, setShowDropOverlay] = useState(false);
+  const [dragOverPage, setDragOverPage] = useState<number | null>(null);
+  
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sigImgRef = useRef<HTMLImageElement>(null);
   const pdfDocRef = useRef<any>(null);
   const [sigRotation, setSigRotation] = useState<number>(0);
   const [offset, setOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Use refs to always access latest state in global handlers
   const draggingRef = useRef(dragging);
@@ -54,7 +58,8 @@ const PDFSigner: React.FC = () => {
     const loadingTask = getDocument(url);
     const pdf = await loadingTask.promise;
     pdfDocRef.current = pdf;
-    // Render all pages and draw them into the actual DOM canvases
+    
+    // Render all pages
     const canvases: Array<HTMLCanvasElement | null> = [];
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
@@ -71,7 +76,6 @@ const PDFSigner: React.FC = () => {
       if (context) {
         await page.render({ canvasContext: context, viewport }).promise;
       }
-      // Attach the canvas to the DOM for display
       canvases.push(domCanvas);
     }
     setPageCanvases(canvases);
@@ -82,13 +86,64 @@ const PDFSigner: React.FC = () => {
     if (!file) return;
     if (!file.type.startsWith('image/')) return;
     setSignatureUrl(URL.createObjectURL(file));
+    setShowDropOverlay(false);
   };
 
-  // Drag logic for signature overlay
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {    if ((e.target as HTMLElement).dataset.handle) return;
+  // PDF container mouse events for signature upload
+  const handlePdfMouseEnter = () => {
+    if (pdfUrl && !signatureUrl) {
+      setShowDropOverlay(true);
+    }
+  };
+
+  const handlePdfMouseLeave = () => {
+    setShowDropOverlay(false);
+    setDragOverPage(null);
+  };
+
+  const handlePageMouseEnter = (pageIndex: number) => {
+    if (pdfUrl && !signatureUrl) {
+      setDragOverPage(pageIndex);
+    }
+  };
+
+  const handlePageMouseLeave = () => {
+    setDragOverPage(null);
+  };
+
+  const handlePdfClick = () => {
+    if (!signatureUrl && fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  // Drag and drop for signature files
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (!signatureUrl) {
+      setShowDropOverlay(true);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setShowDropOverlay(false);
+    setDragOverPage(null);
+    
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      const file = files[0];
+      if (file.type.startsWith('image/')) {
+        setSignatureUrl(URL.createObjectURL(file));
+      }
+    }
+  };
+
+  // Existing signature drag logic
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
+    if ((e.target as HTMLElement).dataset.handle) return;
     setDragging(true);
     const overlayRect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    // Always grab from the center of the signature
     setOffset({
       x: overlayRect.width / 2,
       y: overlayRect.height / 2
@@ -97,48 +152,44 @@ const PDFSigner: React.FC = () => {
     window.addEventListener('mousemove', handleGlobalMouseMove);
     window.addEventListener('mouseup', handleGlobalMouseUp);
   };
+
   const handleGlobalMouseMove = (e: MouseEvent) => {
     if (!draggingRef.current) return;
     
-    // Get the scroll container (the container holding all PDF pages)
     const scrollContainer = document.querySelector('div[style*="overflow-y: auto"]');
     if (!scrollContainer) return;
 
     const scrollRect = scrollContainer.getBoundingClientRect();
     const offset = offsetRef.current;
-    const sigSize = sigSizeRef.current;    // Calculate mouse position relative to the scroll container
+    const sigSize = sigSizeRef.current;
     const relativeY = e.clientY - scrollRect.top + scrollContainer.scrollTop;
 
-    // Find which page we're hovering over based on the relative Y position
     let currentY = 0;
     const pages = Array.from(document.querySelectorAll('[data-canvas-container]'));
     
     for (let i = 0; i < pages.length; i++) {
-        const page = pages[i];
-        const height = page.getBoundingClientRect().height;
+      const page = pages[i];
+      const height = page.getBoundingClientRect().height;
+      
+      if (relativeY >= currentY && relativeY < currentY + height) {
+        const pageRect = page.getBoundingClientRect();
+        const localX = e.clientX - pageRect.left - offset.x;
+        const localY = relativeY - currentY - offset.y;
         
-        if (relativeY >= currentY && relativeY < currentY + height) {
-            // We found the page we're hovering over
-            const pageRect = page.getBoundingClientRect();
-            const localX = e.clientX - pageRect.left - offset.x;
-            const localY = relativeY - currentY - offset.y;
-            
-            // Update current page
-            if (currentPageRef.current !== i + 1) {
-                setCurrentPageRef.current(i + 1);
-            }
-            
-            // Clamp position within current page boundaries
-            const newX = Math.max(0, Math.min(pageRect.width - sigSize, localX));
-            const newY = Math.max(0, Math.min(height - sigSize, localY));
-            
-            setSigPosRef.current({ x: newX, y: newY });
-            return;
+        if (currentPageRef.current !== i + 1) {
+          setCurrentPageRef.current(i + 1);
         }
         
-        currentY += height + 16; // Add page height plus margin
+        const newX = Math.max(0, Math.min(pageRect.width - sigSize, localX));
+        const newY = Math.max(0, Math.min(height - sigSize, localY));
+        
+        setSigPosRef.current({ x: newX, y: newY });
+        return;
+      }
+      
+      currentY += height + 16;
     }
-};
+  };
 
   const handleGlobalMouseUp = () => {
     setDragging(false);
@@ -146,7 +197,6 @@ const PDFSigner: React.FC = () => {
     window.removeEventListener('mouseup', handleGlobalMouseUp);
   };
 
-  // Resize signature from overlay
   const handleOverlayResize = (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
     e.stopPropagation();
     e.preventDefault();
@@ -164,36 +214,25 @@ const PDFSigner: React.FC = () => {
     window.addEventListener('mouseup', up);
   };
 
-  // Adjust rotation logic to ensure proper alignment
   const handleOverlayRotate = (e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
     e.stopPropagation();
     e.preventDefault();
     const rect = e.currentTarget.parentElement?.getBoundingClientRect();
     if (!rect) return;
 
-    // Calculate the center of the signature overlay
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
-
     const startAngle = sigRotation;
-    const startMouseAngle = Math.atan2(
-      e.clientY - centerY,
-      e.clientX - centerX
-    ) * (180 / Math.PI);
+    const startMouseAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
 
     const move = (moveEvent: MouseEvent) => {
       const dx = moveEvent.clientX - centerX;
       const dy = moveEvent.clientY - centerY;
       const currentMouseAngle = Math.atan2(dy, dx) * (180 / Math.PI);
       const deltaAngle = currentMouseAngle - startMouseAngle;
-
-      // Update rotation while keeping it between 0 and 360 degrees
       let newRotation = (startAngle + deltaAngle) % 360;
       if (newRotation < 0) newRotation += 360;
-
       setSigRotation(newRotation);
-
-      // Update the transform origin to ensure rotation is around the center
       const overlay = e.currentTarget.parentElement as HTMLElement;
       if (overlay) {
         overlay.style.transformOrigin = "center center";
@@ -209,39 +248,31 @@ const PDFSigner: React.FC = () => {
     window.addEventListener('mouseup', up);
   };
 
-  // Place signature and export PDF
   const handlePlaceSignature = async () => {
     if (!pdfDocRef.current || !signatureUrl) return;
+    setPlacing(true);
+    
     const { PDFDocument, degrees } = await import('pdf-lib');
     const pdfBytes = await fetch(pdfUrl!).then(r => r.arrayBuffer());
     const pdfDoc = await PDFDocument.load(pdfBytes);
     const imgBytes = await fetch(signatureUrl).then(r => r.arrayBuffer());
     const img = await pdfDoc.embedPng(imgBytes).catch(async () => pdfDoc.embedJpg(imgBytes));
     
-    // Get current page
     const page = pdfDoc.getPage(currentPage - 1);
     const { width: pdfWidth, height: pdfHeight } = page.getSize();
-    
-    // Get canvas for scaling calculation
     const canvas = pageCanvases[currentPage - 1];
     if (!canvas) return;
 
-    // Calculate scaling factors
     const scaleX = pdfWidth / canvas.width;
     const scaleY = pdfHeight / canvas.height;
-
-    // Calculate signature dimensions
     const signatureWidth = sigSize * scaleX;
     const signatureHeight = (sigSize * (img.height / img.width)) * scaleY;
-
-    // Calculate top-left in PDF coordinates
     const pdfX = sigPos.x * scaleX;
     const pdfY = pdfHeight - (sigPos.y * scaleY) - signatureHeight;
 
     let drawX = pdfX;
     let drawY = pdfY;
     if (sigRotation !== 0) {
-      // Move anchor to center, rotate, then move back
       const cx = pdfX + signatureWidth / 2;
       const cy = pdfY + signatureHeight / 2;
       const rad = (-sigRotation * Math.PI) / 180;
@@ -265,30 +296,74 @@ const PDFSigner: React.FC = () => {
     setPlacing(false);
   };
 
-  // Handle page changes
   const handlePageChange = (newPage: number, e?: React.MouseEvent) => {
     if (dragging || e?.defaultPrevented) return;
     setCurrentPage(newPage);
   };
 
+  const resetSignature = () => {
+    setSignatureUrl(null);
+    setSigPos({ x: 50, y: 50 });
+    setSigRotation(0);
+    setSigSize(120);
+  };
+
   return (
     <div style={{ padding: '2rem', textAlign: 'center' }}>
       <h2>Sign PDF</h2>
-      <div style={{ margin: '1.5rem 0' }}>
-        <input type="file" accept="application/pdf" onChange={handlePdfUpload} />
-        {pdfError && <div style={{ color: 'red', marginTop: 8 }}>{pdfError}</div>}
-      </div>
-      <div style={{ margin: '1.5rem 0' }}>
-        <input type="file" accept="image/*" onChange={handleSignatureUpload} />
-        <div style={{ fontSize: 13, color: '#666' }}>Upload signature image (PNG/JPG, transparent preferred)</div>
-      </div>
+      
+      {/* PDF Upload - only show if no PDF loaded */}
+      {!pdfUrl && (
+        <div style={{ margin: '1.5rem 0' }}>
+          <input type="file" accept="application/pdf" onChange={handlePdfUpload} />
+          {pdfError && <div style={{ color: 'red', marginTop: 8 }}>{pdfError}</div>}
+        </div>
+      )}
+
+      {/* Hidden signature input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleSignatureUpload}
+        style={{ display: 'none' }}
+      />
+
+      {/* PDF Viewer with integrated signature upload */}
       {pdfUrl && pageCanvases.length > 0 && (
-        <div style={{ maxHeight: 600, overflowY: 'auto', border: '1px solid #eee', borderRadius: 8, padding: 8, margin: '0 auto', width: 'fit-content' }}>
+        <div 
+          style={{ 
+            maxHeight: 600, 
+            overflowY: 'auto', 
+            border: '1px solid #eee', 
+            borderRadius: 8, 
+            padding: 8, 
+            margin: '0 auto', 
+            width: 'fit-content',
+            position: 'relative'
+          }}
+          onMouseEnter={handlePdfMouseEnter}
+          onMouseLeave={handlePdfMouseLeave}
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
+          onClick={handlePdfClick}
+        >
+    
           {pageCanvases.map((canvas, idx) => (
             <div
               key={idx}
-              style={{ position: 'relative', marginBottom: 16, display: 'flex', justifyContent: 'center' }}
+              style={{ 
+                position: 'relative', 
+                marginBottom: 16, 
+                display: 'flex', 
+                justifyContent: 'center',
+                opacity: dragOverPage === idx ? 0.8 : 1,
+                transition: 'opacity 0.2s',
+                cursor: 'pointer'
+              }}
               onClick={(e) => handlePageChange(idx + 1, e)}
+              onMouseEnter={() => handlePageMouseEnter(idx)}
+              onMouseLeave={handlePageMouseLeave}
             >
               {canvas && (
                 <div
@@ -302,6 +377,33 @@ const PDFSigner: React.FC = () => {
                   }}
                 />
               )}
+
+              {/* Page-specific drop hint */}
+              {dragOverPage === idx && !signatureUrl && (
+                <div
+                  style={{
+                    position: 'fixed',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    background: 'rgba(37, 99, 235, 0.9)',
+                    color: 'white',
+                    padding: '0.5rem 1rem',
+                    borderRadius: 6,
+                    fontSize: '0.9rem',
+                    fontWeight: 600,
+                    pointerEvents: 'none',
+                    zIndex: 5
+                  }}
+                >
+                 📝 Drop signature on page {idx + 1}<br />
+                <span style={{ fontSize: '0.7rem', opacity: 0.7 }}>
+                  or click to browse
+                </span>
+                </div>
+              )}
+
+              {/* Signature overlay */}
               {signatureUrl && idx === currentPage - 1 && (
                 <div
                   data-overlay
@@ -329,7 +431,8 @@ const PDFSigner: React.FC = () => {
                     }}
                     draggable={false}
                   />
-                  {/* Resize handle (bottom-right) as a simple circle */}
+                  
+                  {/* Resize handle */}
                   <div
                     data-handle="resize"
                     style={{
@@ -343,13 +446,11 @@ const PDFSigner: React.FC = () => {
                       cursor: 'nwse-resize',
                       border: '2px solid #fff',
                       zIndex: 3,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
                     }}
                     onMouseDown={handleOverlayResize}
                   />
-                  {/* Rotate handle (top-center) */}
+                  
+                  {/* Rotate handle */}
                   <div
                     data-handle="rotate"
                     style={{
@@ -370,8 +471,7 @@ const PDFSigner: React.FC = () => {
                     }}
                     onMouseDown={handleOverlayRotate}
                   >
-                    {/* Circular arrow for rotate */}
-                    <svg width="14" height="14" viewBox="0 0 14 14" style={{ display: 'block' }}>
+                    <svg width="14" height="14" viewBox="0 0 14 14">
                       <path d="M7 2a5 5 0 1 1-4.33 2.5" fill="none" stroke="#fff" strokeWidth="2" />
                       <polyline points="7,0 7,4 11,4" fill="none" stroke="#fff" strokeWidth="2" />
                     </svg>
@@ -382,17 +482,40 @@ const PDFSigner: React.FC = () => {
           ))}
         </div>
       )}
+
+      {/* Action buttons */}
       {signatureUrl && (
-        <button
-          style={{ marginTop: 16, padding: '0.5rem 1.5rem', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, cursor: 'pointer' }}
-          onClick={handlePlaceSignature}
-          disabled={placing}
-        >
-          Place Signature & Export PDF
-        </button>
-      )}
-      {placing && (
-        <div style={{ marginTop: 16, color: '#2563eb' }}>Exporting PDF...</div>
+        <div style={{ marginTop: 16, display: 'flex', gap: 12, justifyContent: 'center' }}>
+          <button
+            style={{ 
+              padding: '0.5rem 1.5rem', 
+              background: '#2563eb', 
+              color: '#fff', 
+              border: 'none', 
+              borderRadius: 6, 
+              fontWeight: 600, 
+              cursor: 'pointer' 
+            }}
+            onClick={handlePlaceSignature}
+            disabled={placing}
+          >
+            {placing ? 'Exporting...' : 'Place Signature & Export PDF'}
+          </button>
+          <button
+            style={{ 
+              padding: '0.5rem 1.5rem', 
+              background: '#6b7280', 
+              color: '#fff', 
+              border: 'none', 
+              borderRadius: 6, 
+              fontWeight: 600, 
+              cursor: 'pointer' 
+            }}
+            onClick={resetSignature}
+          >
+            Change Signature
+          </button>
+        </div>
       )}
     </div>
   );
