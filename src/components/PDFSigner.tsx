@@ -18,6 +18,8 @@ const PDFSigner: React.FC = () => {
   const [placing, setPlacing] = useState(false);
   const [showDropOverlay, setShowDropOverlay] = useState(false);
   const [dragOverPage, setDragOverPage] = useState<number | null>(null);
+  const [pdfDragOver, setPdfDragOver] = useState(false);
+  const [isHover, setIsHover] = useState(false);
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sigImgRef = useRef<HTMLImageElement>(null);
@@ -25,6 +27,7 @@ const PDFSigner: React.FC = () => {
   const [sigRotation, setSigRotation] = useState<number>(0);
   const [offset, setOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
 
   // Use refs to always access latest state in global handlers
   const draggingRef = useRef(dragging);
@@ -44,8 +47,7 @@ const PDFSigner: React.FC = () => {
   React.useEffect(() => { pageCanvasesRef.current = pageCanvases; }, [pageCanvases]);
   React.useEffect(() => { currentPageRef.current = currentPage; }, [currentPage]);
 
-  const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handlePdfUpload = async (file: File) => {
     if (!file) return;
     if (file.type !== 'application/pdf') {
       setPdfError('Please upload a valid PDF file.');
@@ -81,12 +83,49 @@ const PDFSigner: React.FC = () => {
     setPageCanvases(canvases);
   };
 
+  const handlePdfFileInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      await handlePdfUpload(file);
+    }
+  };
+
   const handleSignatureUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) return;
     setSignatureUrl(URL.createObjectURL(file));
     setShowDropOverlay(false);
+  };
+
+  // PDF dropzone handlers
+  const handlePdfDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setPdfDragOver(true);
+  };
+
+  const handlePdfDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setPdfDragOver(false);
+  };
+
+  const handlePdfDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setPdfDragOver(false);
+    
+    const files = e.dataTransfer.files;
+    if (files.length > 0) {
+      const file = files[0];
+      if (file.type === 'application/pdf') {
+        await handlePdfUpload(file);
+      } else {
+        setPdfError('Please drop a valid PDF file.');
+      }
+    }
+  };
+
+  const handlePdfDropzoneClick = () => {
+    pdfInputRef.current?.click();
   };
 
   // PDF container mouse events for signature upload
@@ -308,19 +347,100 @@ const PDFSigner: React.FC = () => {
     setSigSize(120);
   };
 
+  const resetPdf = () => {
+    setPdfUrl(null);
+    setPdfError(null);
+    setPageCanvases([]);
+    setCurrentPage(1);
+    resetSignature();
+    if (pdfInputRef.current) {
+      pdfInputRef.current.value = '';
+    }
+  };
+
   return (
     <div style={{ padding: '2rem', textAlign: 'center' }}>
-      <h2>Sign PDF</h2>
-      
-      {/* PDF Upload - only show if no PDF loaded */}
+      <h1 className="title">Sign PDF</h1>
+      <p>Sign PDF securely in your browser.</p>
       {!pdfUrl && (
-        <div style={{ margin: '1.5rem 0' }}>
-          <input type="file" accept="application/pdf" onChange={handlePdfUpload} />
-          {pdfError && <div style={{ color: 'red', marginTop: 8 }}>{pdfError}</div>}
+        <div className="merger-steps">
+          <ol>
+            <li><strong>Select PDF</strong> (drag & drop or click)</li>
+            <li><strong>Sign & Download</strong> (instant client-side processing)</li>
+          </ol>
+        </div>
+      )}
+      {/* PDF Upload Dropzone - only show if no PDF loaded */}
+      {!pdfUrl && (
+        <div style={{ margin: '2rem 0' }}>
+          <div
+            onClick={handlePdfDropzoneClick}
+            onDragOver={handlePdfDragOver}
+            onDragLeave={handlePdfDragLeave}
+            onDrop={handlePdfDrop}
+            onMouseEnter={() => setIsHover(true)}  
+            onMouseLeave={() => setIsHover(false)}
+            style={{
+              border: `2px dashed ${pdfDragOver || isHover ? 'rgba(88, 166, 255, 1)' : '#d1d5db'}`,
+              borderRadius: '12px',
+              padding: '3rem 2rem',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              backgroundColor: pdfDragOver ? 'rgba(88, 166, 255, 0.2)' : '#383838',
+              maxWidth: '500px',
+              margin: '0 auto',
+              textAlign: 'center'
+            }}
+          >
+            <div style={{ 
+              fontSize: '2rem', 
+              marginBottom: '1rem',
+              color: pdfDragOver ? '#2563eb' : '#9ca3af'
+            }}>
+              📄
+            </div>
+            <div style={{ 
+              fontSize: '1.1rem', 
+              fontWeight: '600', 
+              marginBottom: '0.5rem',
+              color: pdfDragOver ? '#2563eb' : '#374151'
+            }}>
+              
+            </div>
+            <div style={{ 
+              fontSize: '1rem', 
+              color: '#fef2f2',
+              marginBottom: '1.5rem'
+            }}>
+              Drag and drop your PDF file here, or click to browse
+            </div>
+          </div>
+          
+          {pdfError && (
+            <div style={{ 
+              color: '#dc2626', 
+              marginTop: '1rem',
+              padding: '0.75rem',
+              backgroundColor: '#fef2f2',
+              border: '1px solid #fecaca',
+              borderRadius: '6px',
+              fontSize: '0.9rem'
+            }}>
+              {pdfError}
+            </div>
+          )}
         </div>
       )}
 
-      {/* Hidden signature input */}
+      {/* Hidden file inputs */}
+      <input
+        ref={pdfInputRef}
+        type="file"
+        accept="application/pdf"
+        onChange={handlePdfFileInput}
+        style={{ display: 'none' }}
+      />
+      
       <input
         ref={fileInputRef}
         type="file"
@@ -328,6 +448,27 @@ const PDFSigner: React.FC = () => {
         onChange={handleSignatureUpload}
         style={{ display: 'none' }}
       />
+
+      {/* Change PDF Button */}
+      {pdfUrl && (
+        <div style={{ marginBottom: '1rem' }}>
+          <button
+            style={{ 
+              padding: '0.5rem 1rem', 
+              background: '#6b7280', 
+              color: '#fff', 
+              border: 'none', 
+              borderRadius: 6, 
+              fontWeight: 600, 
+              cursor: 'pointer',
+              fontSize: '0.9rem'
+            }}
+            onClick={resetPdf}
+          >
+            📄 Change PDF
+          </button>
+        </div>
+      )}
 
       {/* PDF Viewer with integrated signature upload */}
       {pdfUrl && pageCanvases.length > 0 && (
