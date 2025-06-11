@@ -36,7 +36,7 @@ The server will start on port 5173 by default.
 - `public/` - Static assets
 - `src/` - Main application source code
 - `src/components/` - UI/UX and PDF list handler
-- `src/services/` - PDF processing logic (merge, validation)
+- `src/services/` - PDF processing logic (merge, validation, sign)
 - `App.tsx` - Root component
 - `main.tsx` - React + Vite entry point
 - `App.css`, `index.css` - Component and global styles
