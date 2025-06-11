@@ -16,7 +16,6 @@ const PDFSigner: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [sigSize, setSigSize] = useState<number>(120);
   const [placing, setPlacing] = useState(false);
-  const [showDropOverlay, setShowDropOverlay] = useState(false);
   const [dragOverPage, setDragOverPage] = useState<number | null>(null);
   const [pdfDragOver, setPdfDragOver] = useState(false);
   const [isHover, setIsHover] = useState(false);
@@ -95,7 +94,6 @@ const PDFSigner: React.FC = () => {
     if (!file) return;
     if (!file.type.startsWith('image/')) return;
     setSignatureUrl(URL.createObjectURL(file));
-    setShowDropOverlay(false);
   };
 
   // PDF dropzone handlers
@@ -129,17 +127,6 @@ const PDFSigner: React.FC = () => {
   };
 
   // PDF container mouse events for signature upload
-  const handlePdfMouseEnter = () => {
-    if (pdfUrl && !signatureUrl) {
-      setShowDropOverlay(true);
-    }
-  };
-
-  const handlePdfMouseLeave = () => {
-    setShowDropOverlay(false);
-    setDragOverPage(null);
-  };
-
   const handlePageMouseEnter = (pageIndex: number) => {
     if (pdfUrl && !signatureUrl) {
       setDragOverPage(pageIndex);
@@ -159,14 +146,10 @@ const PDFSigner: React.FC = () => {
   // Drag and drop for signature files
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-    if (!signatureUrl) {
-      setShowDropOverlay(true);
-    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    setShowDropOverlay(false);
     setDragOverPage(null);
     
     const files = e.dataTransfer.files;
@@ -483,8 +466,6 @@ const PDFSigner: React.FC = () => {
             width: 'fit-content',
             position: 'relative'
           }}
-          onMouseEnter={handlePdfMouseEnter}
-          onMouseLeave={handlePdfMouseLeave}
           onDragOver={handleDragOver}
           onDrop={handleDrop}
           onClick={handlePdfClick}
