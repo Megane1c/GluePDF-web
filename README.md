@@ -6,6 +6,7 @@ A lightweight PDF merging tool built with React, TypeScript, and Vite.
 - Drag-and-drop PDF uploads (multi-select supported)
 - Reorder files via intuitive drag-and-drop (powered by dnd-kit)
 - Merge PDFs client-side (no server needed) using pdf-lib
+- Sign PDF with automatic background removal and signature color changer
 
 ## Getting Started
 
@@ -29,6 +30,8 @@ The server will start on port 5173 by default.
 
 ## Key Code Highlights
 - `pdf.ts`: Handles PDF validation, storage, and merging.
+- `backgroundRemover.ts`: Handles signature background removal.
+- `sigColorChanger.ts`: Handles signature color change.
 - `PDFMerger.tsx`: Manages drag-and-drop, merge workflow, and error states.
 - `PDFList.tsx`: Optimized sortable list with filename truncation and size formatting.
 

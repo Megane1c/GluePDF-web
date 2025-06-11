@@ -4,12 +4,21 @@ import React, { useState, useRef } from 'react';
 import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist';
 import pdfjsWorkerSrc from 'pdfjs-dist/build/pdf.worker.mjs?url';
 
+// Import background removal utility
+import { BackgroundRemover, BackgroundRemovalOptions } from '../services/backgroundRemover';
+
+// Import color changer utility
+import { SignatureColorChanger } from '../services/sigColorChanger';
+
+
 GlobalWorkerOptions.workerSrc = pdfjsWorkerSrc;
 
 const PDFSigner: React.FC = () => {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
+  const [originalSignatureUrl, setOriginalSignatureUrl] = useState<string | null>(null); // Store original
+  const [currentSignatureColor, setCurrentSignatureColor] = useState<string>(SignatureColorChanger.SIGNATURE_COLORS.BLACK);
   const [sigPos, setSigPos] = useState<{ x: number; y: number }>({ x: 50, y: 50 });
   const [dragging, setDragging] = useState(false);
   const [pageCanvases, setPageCanvases] = useState<Array<HTMLCanvasElement | null>>([]);
@@ -19,6 +28,7 @@ const PDFSigner: React.FC = () => {
   const [dragOverPage, setDragOverPage] = useState<number | null>(null);
   const [pdfDragOver, setPdfDragOver] = useState(false);
   const [isHover, setIsHover] = useState(false);
+  const [changingColor, setChangingColor] = useState(false);
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const sigImgRef = useRef<HTMLImageElement>(null);
@@ -27,6 +37,13 @@ const PDFSigner: React.FC = () => {
   const [offset, setOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
+
+  // Background removal options
+  const [bgRemovalOptions] = useState<BackgroundRemovalOptions>({
+    threshold: 240,
+    tolerance: 15,
+    edgeSmoothing: true
+  });
 
   // Use refs to always access latest state in global handlers
   const draggingRef = useRef(dragging);
@@ -89,11 +106,48 @@ const PDFSigner: React.FC = () => {
     }
   };
 
-  const handleSignatureUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const processSignatureImage = async (file: File): Promise<string> => {
+    try {
+      // Remove background from the signature
+      const processedImageUrl = await BackgroundRemover.removeBackground(file, bgRemovalOptions);
+      
+      return processedImageUrl;
+    } catch (error) {
+      console.error('Error processing signature:', error);
+      // Fallback to original image if processing fails
+      return URL.createObjectURL(file);
+    }
+  };
+
+  const handleSignatureUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) return;
-    setSignatureUrl(URL.createObjectURL(file));
+    
+    const processedUrl = await processSignatureImage(file);
+    setOriginalSignatureUrl(processedUrl); // Store the original processed image
+    setSignatureUrl(processedUrl); // Set as current signature
+    setCurrentSignatureColor(SignatureColorChanger.SIGNATURE_COLORS.BLACK); // Reset to black
+  };
+
+  // Handle signature color change
+  const handleColorChange = async (newColor: string) => {
+    if (!originalSignatureUrl) return;
+    
+    try {
+      setChangingColor(true);
+      const coloredSignatureUrl = await SignatureColorChanger.changeSignatureColor(
+        originalSignatureUrl, 
+        newColor,
+        { preserveAlpha: true, threshold: 50 }
+      );
+      setSignatureUrl(coloredSignatureUrl);
+      setCurrentSignatureColor(newColor);
+    } catch (error) {
+      console.error('Error changing signature color:', error);
+    } finally {
+      setChangingColor(false);
+    }
   };
 
   // PDF dropzone handlers
@@ -148,7 +202,7 @@ const PDFSigner: React.FC = () => {
     e.preventDefault();
   };
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setDragOverPage(null);
     
@@ -156,7 +210,10 @@ const PDFSigner: React.FC = () => {
     if (files.length > 0) {
       const file = files[0];
       if (file.type.startsWith('image/')) {
-        setSignatureUrl(URL.createObjectURL(file));
+        const processedUrl = await processSignatureImage(file);
+        setOriginalSignatureUrl(processedUrl);
+        setSignatureUrl(processedUrl);
+        setCurrentSignatureColor(SignatureColorChanger.SIGNATURE_COLORS.BLACK);
       }
     }
   };
@@ -325,9 +382,11 @@ const PDFSigner: React.FC = () => {
 
   const resetSignature = () => {
     setSignatureUrl(null);
+    setOriginalSignatureUrl(null);
     setSigPos({ x: 50, y: 50 });
     setSigRotation(0);
     setSigSize(120);
+    setCurrentSignatureColor(SignatureColorChanger.SIGNATURE_COLORS.BLACK);
   };
 
   const resetPdf = () => {
@@ -341,18 +400,26 @@ const PDFSigner: React.FC = () => {
     }
   };
 
+  // Get color options for the UI
+  const colorOptions = SignatureColorChanger.getColorOptions();
+
   return (
     <div style={{ padding: '2rem', textAlign: 'center' }}>
       <h1 className="title">Sign PDF</h1>
-      <p>Sign PDF securely in your browser.</p>
+      <p>Sign PDF securely in your browser with automatic background removal and color options.</p>
       {!pdfUrl && (
         <div className="merger-steps">
           <ol>
             <li><strong>Select PDF</strong> (drag & drop or click)</li>
+            <li><strong>Upload Signature</strong> (white background auto-removed)</li>
+            <li><strong>Choose Color</strong> (black, blue, red, etc.)</li>
             <li><strong>Sign & Download</strong> (instant client-side processing)</li>
           </ol>
         </div>
       )}
+      
+    
+
       {/* PDF Upload Dropzone - only show if no PDF loaded */}
       {!pdfUrl && (
         <div style={{ margin: '2rem 0' }}>
@@ -383,14 +450,6 @@ const PDFSigner: React.FC = () => {
               📄
             </div>
             <div style={{ 
-              fontSize: '1.1rem', 
-              fontWeight: '600', 
-              marginBottom: '0.5rem',
-              color: pdfDragOver ? '#2563eb' : '#374151'
-            }}>
-              
-            </div>
-            <div style={{ 
               fontSize: '1rem', 
               color: '#fef2f2',
               marginBottom: '1.5rem'
@@ -415,6 +474,7 @@ const PDFSigner: React.FC = () => {
         </div>
       )}
 
+      
       {/* Hidden file inputs */}
       <input
         ref={pdfInputRef}
@@ -455,33 +515,42 @@ const PDFSigner: React.FC = () => {
 
       {/* PDF Viewer with integrated signature upload */}
       {pdfUrl && pageCanvases.length > 0 && (
+      <div
+        style={{
+          display: 'flex',
+          gap: '1rem',
+          justifyContent: 'center',
+          alignItems: 'flex-start',
+          marginTop: '2rem',
+          flexWrap: 'wrap',
+        }}
+      >
+        
+        {/* PDF Viewer */}
         <div 
-          style={{ 
-            maxHeight: 600, 
-            overflowY: 'auto', 
-            border: '1px solid #eee', 
-            borderRadius: 8, 
-            padding: 8, 
-            margin: '0 auto', 
-            width: 'fit-content',
+          style={{
+            maxHeight: 600,
+            overflowY: 'auto',
+            border: '1px solid #eee',
+            borderRadius: 8,
+            padding: 8,
             position: 'relative'
           }}
           onDragOver={handleDragOver}
           onDrop={handleDrop}
           onClick={handlePdfClick}
         >
-    
           {pageCanvases.map((canvas, idx) => (
             <div
               key={idx}
-              style={{ 
-                position: 'relative', 
-                marginBottom: 16, 
-                display: 'flex', 
+              style={{
+                position: 'relative',
+                marginBottom: 16,
+                display: 'flex',
                 justifyContent: 'center',
                 opacity: dragOverPage === idx ? 0.8 : 1,
                 transition: 'opacity 0.2s',
-                cursor: 'pointer'
+                cursor: !signatureUrl ? 'pointer' : 'default'
               }}
               onClick={(e) => handlePageChange(idx + 1, e)}
               onMouseEnter={() => handlePageMouseEnter(idx)}
@@ -500,7 +569,7 @@ const PDFSigner: React.FC = () => {
                 />
               )}
 
-              {/* Page-specific drop hint */}
+              {/* Drop hint and signature overlay are kept as-is */}
               {dragOverPage === idx && !signatureUrl && (
                 <div
                   style={{
@@ -518,14 +587,13 @@ const PDFSigner: React.FC = () => {
                     zIndex: 5
                   }}
                 >
-                 📝 Drop signature on page {idx + 1}<br />
-                <span style={{ fontSize: '0.7rem', opacity: 0.7 }}>
-                  or click to browse
-                </span>
+                  📝 Drop signature on page {idx + 1}<br />
+                  <span style={{ fontSize: '0.7rem', opacity: 0.7 }}>
+                    or click to browse (background auto-removed)
+                  </span>
                 </div>
               )}
 
-              {/* Signature overlay */}
               {signatureUrl && idx === currentPage - 1 && (
                 <div
                   data-overlay
@@ -553,8 +621,7 @@ const PDFSigner: React.FC = () => {
                     }}
                     draggable={false}
                   />
-                  
-                  {/* Resize handle */}
+                  {/* Resize & rotate handles */}
                   <div
                     data-handle="resize"
                     style={{
@@ -571,8 +638,6 @@ const PDFSigner: React.FC = () => {
                     }}
                     onMouseDown={handleOverlayResize}
                   />
-                  
-                  {/* Rotate handle */}
                   <div
                     data-handle="rotate"
                     style={{
@@ -603,7 +668,59 @@ const PDFSigner: React.FC = () => {
             </div>
           ))}
         </div>
-      )}
+        {/* Signature Color Panel (only shown when signature is loaded) */}
+        {signatureUrl && (
+          <div style={{
+            padding: '1rem',
+            background: '#383838',
+            borderRadius: '8px',
+            border: '1px solid #e9ecef',
+            minWidth: '200px'
+          }}>
+            <div style={{
+              fontSize: '0.9rem',
+              fontWeight: '600',
+              marginBottom: '0.5rem',
+              color: '#fff'
+            }}>
+              📝 Signature Color Options
+            </div>
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.5rem'
+            }}>
+              {colorOptions.map((color) => (
+                <button
+                  key={color.value}
+                  onClick={() => handleColorChange(color.value)}
+                  disabled={changingColor}
+                  style={{
+                    padding: '0.5rem 0.75rem',
+                    border: currentSignatureColor === color.value ? '2px solid #2563eb' : '1px solid #ced4da',
+                    borderRadius: '6px',
+                    background: currentSignatureColor === color.value ? '#C0C0D0' : '#1a1a1a',
+                    cursor: changingColor ? 'not-allowed' : 'pointer',
+                    fontSize: '0.8rem',
+                    fontWeight: '500',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.25rem',
+                    opacity: changingColor ? 0.3 : 1,
+                    transition: 'all 0.2s ease'
+                  }}
+                  title={`Change signature to ${color.name.toLowerCase()}`}
+                >
+                  <span style={{ fontSize: '0.9rem' }}>{color.icon}</span>
+                  {color.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    )}
+
 
       {/* Action buttons */}
       {signatureUrl && (
@@ -639,6 +756,14 @@ const PDFSigner: React.FC = () => {
           </button>
         </div>
       )}
+
+      {/* CSS Animation for loading spinner */}
+      <style>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 };
