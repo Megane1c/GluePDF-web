@@ -123,11 +123,40 @@ const PDFSigner: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) return;
-    
+
     const processedUrl = await processSignatureImage(file);
     setOriginalSignatureUrl(processedUrl); // Store the original processed image
     setSignatureUrl(processedUrl); // Set as current signature
     setCurrentSignatureColor(SignatureColorChanger.SIGNATURE_COLORS.BLACK); // Reset to black
+
+    // Center the signature in the visible area of the current page
+    setTimeout(() => {
+      // Find the scrollable PDF viewer container
+      const scrollContainer = document.querySelector('div[style*="overflow-y: auto"]');
+      // Find the current page's canvas container
+      const pageContainers = document.querySelectorAll('[data-canvas-container]');
+      const currentPageIdx = currentPage - 1;
+      const pageContainer = pageContainers[currentPageIdx] as HTMLElement | undefined;
+      if (!scrollContainer || !pageContainer) return;
+
+      const scrollRect = (scrollContainer as HTMLElement).getBoundingClientRect();
+      const pageRect = pageContainer.getBoundingClientRect();
+      // Calculate visible area of the page within the scroll container
+      const visibleTop = Math.max(scrollRect.top, pageRect.top);
+      const visibleBottom = Math.min(scrollRect.bottom, pageRect.bottom);
+      const visibleLeft = Math.max(scrollRect.left, pageRect.left);
+      const visibleRight = Math.min(scrollRect.right, pageRect.right);
+
+      // Calculate center of the visible area relative to the page
+      const centerX = (visibleLeft + visibleRight) / 2 - pageRect.left;
+      const centerY = (visibleTop + visibleBottom) / 2 - pageRect.top;
+      // Use sigSize from state
+      const size = sigSizeRef.current || 120;
+      // Adjust so signature is centered
+      const newX = Math.max(0, Math.min(pageRect.width - size, centerX - size / 2));
+      const newY = Math.max(0, Math.min(pageRect.height - size, centerY - size / 2));
+      setSigPos({ x: newX, y: newY });
+    }, 0);
   };
 
   // Handle signature color change
@@ -387,6 +416,9 @@ const PDFSigner: React.FC = () => {
     setSigRotation(0);
     setSigSize(120);
     setCurrentSignatureColor(SignatureColorChanger.SIGNATURE_COLORS.BLACK);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const resetPdf = () => {
