@@ -437,10 +437,11 @@ const PDFSigner: React.FC = () => {
 
   return (
     <div style={{ padding: '1rem', textAlign: 'center' }}>
-      <h1 className="title">Sign PDF</h1>
-      <p>Sign PDF securely in your browser with automatic background removal and color options.</p>
+      
       {!pdfUrl && (
-        <div className="merger-steps">
+        <div className="merger-steps" >
+          <h1 className="title" style={{ textAlign: 'center' }}>Sign PDF</h1>
+          <p>Sign PDF securely in your browser with automatic background removal and color options.</p>
           <ol>
             <li><strong>Select PDF</strong> (drag & drop or click)</li>
             <li><strong>Upload Signature</strong> (white background auto-removed)</li>
@@ -521,6 +522,42 @@ const PDFSigner: React.FC = () => {
         onChange={handleSignatureUpload}
         style={{ display: 'none' }}
       />
+
+      {/* PDF Loading Indicator */}
+      {pdfUrl && pageCanvases.length === 0 && (
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '3rem 2rem',
+          gap: '1rem'
+        }}>
+          <div style={{
+            width: '40px',
+            height: '40px',
+            border: '4px solid #e5e7eb',
+            borderTop: '4px solid #2563eb',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite'
+          }}></div>
+          <div style={{
+            color: '#6b7280',
+            fontSize: '1rem',
+            fontWeight: '500'
+          }}>
+            Loading PDF...
+          </div>
+          <div style={{
+            color: '#9ca3af',
+            fontSize: '0.875rem',
+            textAlign: 'center',
+            maxWidth: '300px'
+          }}>
+            Please wait
+          </div>
+        </div>
+      )}
 
       {/* PDF Viewer with integrated signature upload */}
       {pdfUrl && pageCanvases.length > 0 && (
