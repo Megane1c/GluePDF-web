@@ -436,7 +436,7 @@ const PDFSigner: React.FC = () => {
   const colorOptions = SignatureColorChanger.getColorOptions();
 
   return (
-    <div style={{ padding: '2rem', textAlign: 'center' }}>
+    <div style={{ padding: '1rem', textAlign: 'center' }}>
       <h1 className="title">Sign PDF</h1>
       <p>Sign PDF securely in your browser with automatic background removal and color options.</p>
       {!pdfUrl && (
@@ -450,8 +450,6 @@ const PDFSigner: React.FC = () => {
         </div>
       )}
       
-    
-
       {/* PDF Upload Dropzone - only show if no PDF loaded */}
       {!pdfUrl && (
         <div style={{ margin: '2rem 0' }}>
@@ -524,8 +522,10 @@ const PDFSigner: React.FC = () => {
         style={{ display: 'none' }}
       />
 
-      {/* Change PDF Button */}
-      {pdfUrl && (
+      {/* PDF Viewer with integrated signature upload */}
+      {pdfUrl && pageCanvases.length > 0 && (
+      <>
+        {/* Change PDF Button - appears after PDF is successfully rendered */}
         <div style={{ marginBottom: '1rem' }}>
           <button
             style={{ 
@@ -543,251 +543,252 @@ const PDFSigner: React.FC = () => {
             📄 Change PDF
           </button>
         </div>
-      )}
 
-      {/* PDF Viewer with integrated signature upload */}
-      {pdfUrl && pageCanvases.length > 0 && (
-      <div
-        style={{
-          display: 'flex',
-          gap: '1rem',
-          justifyContent: 'center',
-          alignItems: 'flex-start',
-          marginTop: '2rem',
-          flexWrap: 'wrap',
-        }}
-      >
-        
-        {/* PDF Viewer */}
-        <div 
+        <div
           style={{
-            maxHeight: 600,
-            overflowY: 'auto',
-            border: '1px solid #eee',
-            borderRadius: 8,
-            padding: 8,
-            position: 'relative'
+            display: 'flex',
+            gap: '1rem',
+            justifyContent: 'center',
+            alignItems: 'flex-start',
+            marginTop: '2rem',
+            flexWrap: 'wrap',
           }}
-          onDragOver={handleDragOver}
-          onDrop={handleDrop}
-          onClick={handlePdfClick}
         >
-          {pageCanvases.map((canvas, idx) => (
-            <div
-              key={idx}
-              style={{
-                position: 'relative',
-                marginBottom: 16,
-                display: 'flex',
-                justifyContent: 'center',
-                opacity: dragOverPage === idx ? 0.8 : 1,
-                transition: 'opacity 0.2s',
-                cursor: !signatureUrl ? 'pointer' : 'default'
-              }}
-              onClick={(e) => handlePageChange(idx + 1, e)}
-              onMouseEnter={() => handlePageMouseEnter(idx)}
-              onMouseLeave={handlePageMouseLeave}
-            >
-              {canvas && (
-                <div
-                  data-canvas-container
-                  style={{ position: 'relative', display: 'inline-block' }}
-                  ref={el => {
-                    if (el && !el.contains(canvas)) {
-                      el.innerHTML = '';
-                      el.appendChild(canvas);
-                    }
-                  }}
-                />
-              )}
-
-              {/* Drop hint and signature overlay are kept as-is */}
-              {dragOverPage === idx && !signatureUrl && (
-                <div
-                  style={{
-                    position: 'fixed',
-                    top: '50%',
-                    left: '50%',
-                    transform: 'translate(-50%, -50%)',
-                    background: 'rgba(37, 99, 235, 0.9)',
-                    color: 'white',
-                    padding: '0.5rem 1rem',
-                    borderRadius: 6,
-                    fontSize: '0.9rem',
-                    fontWeight: 600,
-                    pointerEvents: 'none',
-                    zIndex: 5
-                  }}
-                >
-                  📝 Drop signature on page {idx + 1}<br />
-                  <span style={{ fontSize: '0.7rem', opacity: 0.7 }}>
-                    or click to browse (background auto-removed)
-                  </span>
-                </div>
-              )}
-
-              {signatureUrl && idx === currentPage - 1 && (
-                <div
-                  data-overlay
-                  style={{
-                    position: 'absolute',
-                    left: sigPos.x,
-                    top: sigPos.y,
-                    width: sigSize,
-                    height: 'auto',
-                    transform: `rotate(${sigRotation}deg)`,
-                    zIndex: 2,
-                    cursor: dragging ? 'grabbing' : 'grab',
-                    userSelect: 'none',
-                  }}
-                  onMouseDown={handleMouseDown}
-                >
-                  <img
-                    ref={sigImgRef}
-                    src={signatureUrl}
-                    alt="Signature"
-                    style={{
-                      width: '100%',
-                      height: 'auto',
-                      display: 'block',
-                    }}
-                    draggable={false}
-                  />
-                  {/* Resize & rotate handles */}
+          
+          {/* PDF Viewer */}
+          <div 
+            style={{
+              maxHeight: 600,
+              overflowY: 'auto',
+              border: '1px solid #eee',
+              borderRadius: 8,
+              padding: 8,
+              position: 'relative'
+            }}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+            onClick={handlePdfClick}
+          >
+            {pageCanvases.map((canvas, idx) => (
+              <div
+                key={idx}
+                style={{
+                  position: 'relative',
+                  marginBottom: 16,
+                  display: 'flex',
+                  justifyContent: 'center',
+                  opacity: dragOverPage === idx ? 0.8 : 1,
+                  transition: 'opacity 0.2s',
+                  cursor: !signatureUrl ? 'pointer' : 'default'
+                }}
+                onClick={(e) => handlePageChange(idx + 1, e)}
+                onMouseEnter={() => handlePageMouseEnter(idx)}
+                onMouseLeave={handlePageMouseLeave}
+              >
+                {canvas && (
                   <div
-                    data-handle="resize"
-                    style={{
-                      position: 'absolute',
-                      right: -12,
-                      bottom: -12,
-                      width: 20,
-                      height: 20,
-                      background: '#2563eb',
-                      borderRadius: '50%',
-                      cursor: 'nwse-resize',
-                      border: '2px solid #fff',
-                      zIndex: 3,
+                    data-canvas-container
+                    style={{ position: 'relative', display: 'inline-block' }}
+                    ref={el => {
+                      if (el && !el.contains(canvas)) {
+                        el.innerHTML = '';
+                        el.appendChild(canvas);
+                      }
                     }}
-                    onMouseDown={handleOverlayResize}
                   />
+                )}
+
+                {/* Drop hint and signature overlay are kept as-is */}
+                {dragOverPage === idx && !signatureUrl && (
                   <div
-                    data-handle="rotate"
                     style={{
-                      position: 'absolute',
+                      position: 'fixed',
+                      top: '50%',
                       left: '50%',
-                      top: -30,
-                      transform: 'translateX(-50%)',
-                      width: 20,
-                      height: 20,
-                      background: '#2563eb',
-                      borderRadius: '50%',
-                      cursor: 'grab',
-                      border: '2px solid #fff',
-                      zIndex: 3,
+                      transform: 'translate(-50%, -50%)',
+                      background: 'rgba(37, 99, 235, 0.9)',
+                      color: 'white',
+                      padding: '0.5rem 1rem',
+                      borderRadius: 6,
+                      fontSize: '0.9rem',
+                      fontWeight: 600,
+                      pointerEvents: 'none',
+                      zIndex: 5
+                    }}
+                  >
+                    📝 Drop signature on page {idx + 1}<br />
+                    <span style={{ fontSize: '0.7rem', opacity: 0.7 }}>
+                      or click to browse (background auto-removed)
+                    </span>
+                  </div>
+                )}
+
+                {signatureUrl && idx === currentPage - 1 && (
+                  <div
+                    data-overlay
+                    style={{
+                      position: 'absolute',
+                      left: sigPos.x,
+                      top: sigPos.y,
+                      width: sigSize,
+                      height: 'auto',
+                      transform: `rotate(${sigRotation}deg)`,
+                      zIndex: 2,
+                      cursor: dragging ? 'grabbing' : 'grab',
+                      userSelect: 'none',
+                    }}
+                    onMouseDown={handleMouseDown}
+                  >
+                    <img
+                      ref={sigImgRef}
+                      src={signatureUrl}
+                      alt="Signature"
+                      style={{
+                        width: '100%',
+                        height: 'auto',
+                        display: 'block',
+                      }}
+                      draggable={false}
+                    />
+                    {/* Resize & rotate handles */}
+                    <div
+                      data-handle="resize"
+                      style={{
+                        position: 'absolute',
+                        right: -12,
+                        bottom: -12,
+                        width: 20,
+                        height: 20,
+                        background: '#2563eb',
+                        borderRadius: '50%',
+                        cursor: 'nwse-resize',
+                        border: '2px solid #fff',
+                        zIndex: 3,
+                      }}
+                      onMouseDown={handleOverlayResize}
+                    />
+                    <div
+                      data-handle="rotate"
+                      style={{
+                        position: 'absolute',
+                        left: '50%',
+                        top: -30,
+                        transform: 'translateX(-50%)',
+                        width: 20,
+                        height: 20,
+                        background: '#2563eb',
+                        borderRadius: '50%',
+                        cursor: 'grab',
+                        border: '2px solid #fff',
+                        zIndex: 3,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                      onMouseDown={handleOverlayRotate}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 14 14">
+                        <path d="M7 2a5 5 0 1 1-4.33 2.5" fill="none" stroke="#fff" strokeWidth="2" />
+                        <polyline points="7,0 7,4 11,4" fill="none" stroke="#fff" strokeWidth="2" />
+                      </svg>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Signature Color Panel with Action Buttons (only shown when signature is loaded) */}
+          {signatureUrl && (
+            <div style={{
+              padding: '1rem',
+              background: '#383838',
+              borderRadius: '8px',
+              border: '1px solid #e9ecef',
+              minWidth: '200px',
+              display: 'flex',
+              flexDirection: 'column'
+            }}>
+              <div style={{
+                fontSize: '0.9rem',
+                fontWeight: '600',
+                marginBottom: '0.5rem',
+                color: '#fff'
+              }}>
+                📝 Signature Color Options
+              </div>
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.5rem',
+                marginBottom: '1rem'
+              }}>
+                {colorOptions.map((color) => (
+                  <button
+                    key={color.value}
+                    onClick={() => handleColorChange(color.value)}
+                    disabled={changingColor}
+                    style={{
+                      padding: '0.5rem 0.75rem',
+                      border: currentSignatureColor === color.value ? '2px solid #2563eb' : '1px solid #ced4da',
+                      borderRadius: '6px',
+                      background: currentSignatureColor === color.value ? '#C0C0D0' : '#1a1a1a',
+                      cursor: changingColor ? 'not-allowed' : 'pointer',
+                      fontSize: '0.8rem',
+                      fontWeight: '500',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center',
+                      gap: '0.25rem',
+                      opacity: changingColor ? 0.3 : 1,
+                      transition: 'all 0.2s ease'
                     }}
-                    onMouseDown={handleOverlayRotate}
+                    title={`Change signature to ${color.name.toLowerCase()}`}
                   >
-                    <svg width="14" height="14" viewBox="0 0 14 14">
-                      <path d="M7 2a5 5 0 1 1-4.33 2.5" fill="none" stroke="#fff" strokeWidth="2" />
-                      <polyline points="7,0 7,4 11,4" fill="none" stroke="#fff" strokeWidth="2" />
-                    </svg>
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-        {/* Signature Color Panel (only shown when signature is loaded) */}
-        {signatureUrl && (
-          <div style={{
-            padding: '1rem',
-            background: '#383838',
-            borderRadius: '8px',
-            border: '1px solid #e9ecef',
-            minWidth: '200px'
-          }}>
-            <div style={{
-              fontSize: '0.9rem',
-              fontWeight: '600',
-              marginBottom: '0.5rem',
-              color: '#fff'
-            }}>
-              📝 Signature Color Options
-            </div>
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '0.5rem'
-            }}>
-              {colorOptions.map((color) => (
+                    <span style={{ fontSize: '0.9rem' }}>{color.icon}</span>
+                    {color.name}
+                  </button>
+                ))}
+              </div>
+              
+              {/* Action buttons moved here */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <button
-                  key={color.value}
-                  onClick={() => handleColorChange(color.value)}
-                  disabled={changingColor}
-                  style={{
-                    padding: '0.5rem 0.75rem',
-                    border: currentSignatureColor === color.value ? '2px solid #2563eb' : '1px solid #ced4da',
-                    borderRadius: '6px',
-                    background: currentSignatureColor === color.value ? '#C0C0D0' : '#1a1a1a',
-                    cursor: changingColor ? 'not-allowed' : 'pointer',
-                    fontSize: '0.8rem',
-                    fontWeight: '500',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.25rem',
-                    opacity: changingColor ? 0.3 : 1,
-                    transition: 'all 0.2s ease'
+                  style={{ 
+                    padding: '0.5rem 1rem', 
+                    background: '#2563eb', 
+                    color: '#fff', 
+                    border: 'none', 
+                    borderRadius: 6, 
+                    fontWeight: 600, 
+                    cursor: 'pointer',
+                    fontSize: '0.9rem'
                   }}
-                  title={`Change signature to ${color.name.toLowerCase()}`}
+                  onClick={handlePlaceSignature}
+                  disabled={placing}
                 >
-                  <span style={{ fontSize: '0.9rem' }}>{color.icon}</span>
-                  {color.name}
+                  {placing ? 'Exporting...' : 'Place Signature & Export PDF'}
                 </button>
-              ))}
+                <button
+                  style={{ 
+                    padding: '0.5rem 1rem', 
+                    background: '#6b7280', 
+                    color: '#fff', 
+                    border: 'none', 
+                    borderRadius: 6, 
+                    fontWeight: 600, 
+                    cursor: 'pointer',
+                    fontSize: '0.9rem'
+                  }}
+                  onClick={resetSignature}
+                >
+                  Change Signature
+                </button>
+              </div>
             </div>
-          </div>
-        )}
-      </div>
-    )}
-
-
-      {/* Action buttons */}
-      {signatureUrl && (
-        <div style={{ marginTop: 16, display: 'flex', gap: 12, justifyContent: 'center' }}>
-          <button
-            style={{ 
-              padding: '0.5rem 1.5rem', 
-              background: '#2563eb', 
-              color: '#fff', 
-              border: 'none', 
-              borderRadius: 6, 
-              fontWeight: 600, 
-              cursor: 'pointer' 
-            }}
-            onClick={handlePlaceSignature}
-            disabled={placing}
-          >
-            {placing ? 'Exporting...' : 'Place Signature & Export PDF'}
-          </button>
-          <button
-            style={{ 
-              padding: '0.5rem 1.5rem', 
-              background: '#6b7280', 
-              color: '#fff', 
-              border: 'none', 
-              borderRadius: 6, 
-              fontWeight: 600, 
-              cursor: 'pointer' 
-            }}
-            onClick={resetSignature}
-          >
-            Change Signature
-          </button>
+          )}
         </div>
-      )}
+      </>
+    )}
 
       {/* CSS Animation for loading spinner */}
       <style>{`
