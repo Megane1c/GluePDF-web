@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import '../styles/PDFSigner.css';
 
 // Import PDF.js for rendering
 import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist';
@@ -62,6 +63,40 @@ const PDFSigner: React.FC = () => {
   React.useEffect(() => { setCurrentPageRef.current = setCurrentPage; }, [setCurrentPage]);
   React.useEffect(() => { pageCanvasesRef.current = pageCanvases; }, [pageCanvases]);
   React.useEffect(() => { currentPageRef.current = currentPage; }, [currentPage]);
+
+  React.useEffect(() => {
+    const scrollContainer = document.querySelector('.pdf-viewer');
+    if (!scrollContainer) return;
+
+    const handleScroll = () => {
+      const pageContainers = document.querySelectorAll('[data-canvas-container]');
+      if (pageContainers.length === 0) return;
+
+      const scrollRect = scrollContainer.getBoundingClientRect();
+      let mostVisiblePage = -1;
+      let maxVisibility = 0;
+
+      pageContainers.forEach((page, index) => {
+        const pageRect = page.getBoundingClientRect();
+        const visibleHeight = Math.max(0, Math.min(pageRect.bottom, scrollRect.bottom) - Math.max(pageRect.top, scrollRect.top));
+        const visibility = visibleHeight / pageRect.height;
+
+        if (visibility > maxVisibility) {
+          maxVisibility = visibility;
+          mostVisiblePage = index + 1;
+        }
+      });
+
+      if (mostVisiblePage !== -1 && mostVisiblePage !== currentPageRef.current) {
+        setCurrentPage(mostVisiblePage);
+      }
+    };
+
+    scrollContainer.addEventListener('scroll', handleScroll);
+    return () => {
+      scrollContainer.removeEventListener('scroll', handleScroll);
+    };
+  }, [pageCanvases]);
 
   const handlePdfUpload = async (file: File) => {
     if (!file) return;
@@ -131,30 +166,28 @@ const PDFSigner: React.FC = () => {
 
     // Center the signature in the visible area of the current page
     setTimeout(() => {
-      // Find the scrollable PDF viewer container
-      const scrollContainer = document.querySelector('div[style*="overflow-y: auto"]');
-      // Find the current page's canvas container
+      const scrollContainer = document.querySelector('.pdf-viewer');
       const pageContainers = document.querySelectorAll('[data-canvas-container]');
-      const currentPageIdx = currentPage - 1;
+      const currentPageIdx = currentPageRef.current - 1;
       const pageContainer = pageContainers[currentPageIdx] as HTMLElement | undefined;
+
       if (!scrollContainer || !pageContainer) return;
 
-      const scrollRect = (scrollContainer as HTMLElement).getBoundingClientRect();
+      const scrollRect = scrollContainer.getBoundingClientRect();
       const pageRect = pageContainer.getBoundingClientRect();
-      // Calculate visible area of the page within the scroll container
+
       const visibleTop = Math.max(scrollRect.top, pageRect.top);
       const visibleBottom = Math.min(scrollRect.bottom, pageRect.bottom);
       const visibleLeft = Math.max(scrollRect.left, pageRect.left);
       const visibleRight = Math.min(scrollRect.right, pageRect.right);
 
-      // Calculate center of the visible area relative to the page
       const centerX = (visibleLeft + visibleRight) / 2 - pageRect.left;
       const centerY = (visibleTop + visibleBottom) / 2 - pageRect.top;
-      // Use sigSize from state
+
       const size = sigSizeRef.current || 120;
-      // Adjust so signature is centered
       const newX = Math.max(0, Math.min(pageRect.width - size, centerX - size / 2));
       const newY = Math.max(0, Math.min(pageRect.height - size, centerY - size / 2));
+
       setSigPos({ x: newX, y: newY });
     }, 0);
   };
@@ -264,7 +297,7 @@ const PDFSigner: React.FC = () => {
   const handleGlobalMouseMove = (e: MouseEvent) => {
     if (!draggingRef.current) return;
     
-    const scrollContainer = document.querySelector('div[style*="overflow-y: auto"]');
+    const scrollContainer = document.querySelector('.pdf-viewer');
     if (!scrollContainer) return;
 
     const scrollRect = scrollContainer.getBoundingClientRect();
@@ -288,8 +321,14 @@ const PDFSigner: React.FC = () => {
           setCurrentPageRef.current(i + 1);
         }
         
+        const sigImg = sigImgRef.current;
+        if (!sigImg) return;
+
+        const aspectRatio = sigImg.naturalHeight / sigImg.naturalWidth;
+        const sigHeight = sigSize * aspectRatio;
+
         const newX = Math.max(0, Math.min(pageRect.width - sigSize, localX));
-        const newY = Math.max(0, Math.min(height - sigSize, localY));
+        const newY = Math.max(0, Math.min(height - sigHeight, localY));
         
         setSigPosRef.current({ x: newX, y: newY });
         return;
@@ -436,11 +475,11 @@ const PDFSigner: React.FC = () => {
   const colorOptions = SignatureColorChanger.getColorOptions();
 
   return (
-    <div style={{ padding: '1rem', textAlign: 'center' }}>
+    <div className="signer-container">
       
       {!pdfUrl && (
-        <div className="merger-steps" >
-          <h1 className="title" style={{ textAlign: 'center' }}>Sign PDF</h1>
+        <div className="signer-steps">
+          <h1 className="title">Sign PDF</h1>
           <p>Sign PDF securely in your browser with automatic background removal and color options.</p>
           <ol>
             <li><strong>Select PDF</strong> (drag & drop or click)</li>
@@ -453,7 +492,7 @@ const PDFSigner: React.FC = () => {
       
       {/* PDF Upload Dropzone - only show if no PDF loaded */}
       {!pdfUrl && (
-        <div style={{ margin: '2rem 0' }}>
+        <div className="pdf-dropzone-container">
           <div
             onClick={handlePdfDropzoneClick}
             onDragOver={handlePdfDragOver}
@@ -461,44 +500,18 @@ const PDFSigner: React.FC = () => {
             onDrop={handlePdfDrop}
             onMouseEnter={() => setIsHover(true)}  
             onMouseLeave={() => setIsHover(false)}
-            style={{
-              border: `2px dashed ${pdfDragOver || isHover ? 'rgba(88, 166, 255, 1)' : '#d1d5db'}`,
-              borderRadius: '12px',
-              padding: '3rem 2rem',
-              cursor: 'pointer',
-              transition: 'all 0.2s ease',
-              backgroundColor: pdfDragOver ? 'rgba(88, 166, 255, 0.2)' : '#383838',
-              maxWidth: '500px',
-              margin: '0 auto',
-              textAlign: 'center'
-            }}
+            className={`pdf-dropzone ${pdfDragOver || isHover ? 'drag-over' : ''}`}
           >
-            <div style={{ 
-              fontSize: '2rem', 
-              marginBottom: '1rem',
-              color: pdfDragOver ? '#2563eb' : '#9ca3af'
-            }}>
+            <div className={`pdf-dropzone-icon ${pdfDragOver ? 'drag-over' : ''}`}>
               📄
             </div>
-            <div style={{ 
-              fontSize: '1rem', 
-              color: '#fef2f2',
-              marginBottom: '1.5rem'
-            }}>
+            <div className="pdf-dropzone-text">
               Drag and drop your PDF file here, or click to browse
             </div>
           </div>
           
           {pdfError && (
-            <div style={{ 
-              color: '#dc2626', 
-              marginTop: '1rem',
-              padding: '0.75rem',
-              backgroundColor: '#fef2f2',
-              border: '1px solid #fecaca',
-              borderRadius: '6px',
-              fontSize: '0.9rem'
-            }}>
+            <div className="pdf-error">
               {pdfError}
             </div>
           )}
@@ -512,7 +525,7 @@ const PDFSigner: React.FC = () => {
         type="file"
         accept="application/pdf"
         onChange={handlePdfFileInput}
-        style={{ display: 'none' }}
+        className="hidden-file-input"
       />
       
       <input
@@ -520,40 +533,17 @@ const PDFSigner: React.FC = () => {
         type="file"
         accept="image/*"
         onChange={handleSignatureUpload}
-        style={{ display: 'none' }}
+        className="hidden-file-input"
       />
 
       {/* PDF Loading Indicator */}
       {pdfUrl && pageCanvases.length === 0 && (
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '3rem 2rem',
-          gap: '1rem'
-        }}>
-          <div style={{
-            width: '40px',
-            height: '40px',
-            border: '4px solid #e5e7eb',
-            borderTop: '4px solid #2563eb',
-            borderRadius: '50%',
-            animation: 'spin 1s linear infinite'
-          }}></div>
-          <div style={{
-            color: '#6b7280',
-            fontSize: '1rem',
-            fontWeight: '500'
-          }}>
+        <div className="pdf-loading-indicator">
+          <div className="spinner"></div>
+          <div className="loading-text">
             Loading PDF...
           </div>
-          <div style={{
-            color: '#9ca3af',
-            fontSize: '0.875rem',
-            textAlign: 'center',
-            maxWidth: '300px'
-          }}>
+          <div className="loading-subtext">
             Please wait
           </div>
         </div>
@@ -563,45 +553,20 @@ const PDFSigner: React.FC = () => {
       {pdfUrl && pageCanvases.length > 0 && (
       <>
         {/* Change PDF Button - appears after PDF is successfully rendered */}
-        <div style={{ marginBottom: '1rem' }}>
+        <div className="change-pdf-button-container">
           <button
-            style={{ 
-              padding: '0.5rem 1rem', 
-              background: '#6b7280', 
-              color: '#fff', 
-              border: 'none', 
-              borderRadius: 6, 
-              fontWeight: 600, 
-              cursor: 'pointer',
-              fontSize: '0.9rem'
-            }}
+            className="change-pdf-button"
             onClick={resetPdf}
           >
             📄 Change PDF
           </button>
         </div>
 
-        <div
-          style={{
-            display: 'flex',
-            gap: '1rem',
-            justifyContent: 'center',
-            alignItems: 'flex-start',
-            marginTop: '2rem',
-            flexWrap: 'wrap',
-          }}
-        >
+        <div className="signer-layout">
           
           {/* PDF Viewer */}
           <div 
-            style={{
-              maxHeight: 600,
-              overflowY: 'auto',
-              border: '1px solid #eee',
-              borderRadius: 8,
-              padding: 8,
-              position: 'relative'
-            }}
+            className="pdf-viewer"
             onDragOver={handleDragOver}
             onDrop={handleDrop}
             onClick={handlePdfClick}
@@ -609,15 +574,7 @@ const PDFSigner: React.FC = () => {
             {pageCanvases.map((canvas, idx) => (
               <div
                 key={idx}
-                style={{
-                  position: 'relative',
-                  marginBottom: 16,
-                  display: 'flex',
-                  justifyContent: 'center',
-                  opacity: dragOverPage === idx ? 0.8 : 1,
-                  transition: 'opacity 0.2s',
-                  cursor: !signatureUrl ? 'pointer' : 'default'
-                }}
+                className={`page-container ${!signatureUrl ? 'droppable' : ''} ${dragOverPage === idx ? 'drag-over-page' : ''}`}
                 onClick={(e) => handlePageChange(idx + 1, e)}
                 onMouseEnter={() => handlePageMouseEnter(idx)}
                 onMouseLeave={handlePageMouseLeave}
@@ -625,7 +582,7 @@ const PDFSigner: React.FC = () => {
                 {canvas && (
                   <div
                     data-canvas-container
-                    style={{ position: 'relative', display: 'inline-block' }}
+                    className="canvas-wrapper"
                     ref={el => {
                       if (el && !el.contains(canvas)) {
                         el.innerHTML = '';
@@ -637,24 +594,9 @@ const PDFSigner: React.FC = () => {
 
                 {/* Drop hint and signature overlay are kept as-is */}
                 {dragOverPage === idx && !signatureUrl && (
-                  <div
-                    style={{
-                      position: 'fixed',
-                      top: '50%',
-                      left: '50%',
-                      transform: 'translate(-50%, -50%)',
-                      background: 'rgba(37, 99, 235, 0.9)',
-                      color: 'white',
-                      padding: '0.5rem 1rem',
-                      borderRadius: 6,
-                      fontSize: '0.9rem',
-                      fontWeight: 600,
-                      pointerEvents: 'none',
-                      zIndex: 5
-                    }}
-                  >
+                  <div className="drop-hint">
                     📝 Drop signature on page {idx + 1}<br />
-                    <span style={{ fontSize: '0.7rem', opacity: 0.7 }}>
+                    <span className="drop-hint-subtext">
                       or click to browse (background auto-removed)
                     </span>
                   </div>
@@ -663,16 +605,12 @@ const PDFSigner: React.FC = () => {
                 {signatureUrl && idx === currentPage - 1 && (
                   <div
                     data-overlay
+                    className={`signature-overlay ${dragging ? 'dragging' : ''}`}
                     style={{
-                      position: 'absolute',
                       left: sigPos.x,
                       top: sigPos.y,
                       width: sigSize,
-                      height: 'auto',
                       transform: `rotate(${sigRotation}deg)`,
-                      zIndex: 2,
-                      cursor: dragging ? 'grabbing' : 'grab',
-                      userSelect: 'none',
                     }}
                     onMouseDown={handleMouseDown}
                   >
@@ -680,53 +618,23 @@ const PDFSigner: React.FC = () => {
                       ref={sigImgRef}
                       src={signatureUrl}
                       alt="Signature"
-                      style={{
-                        width: '100%',
-                        height: 'auto',
-                        display: 'block',
-                      }}
+                      className="signature-image"
                       draggable={false}
                     />
                     {/* Resize & rotate handles */}
                     <div
                       data-handle="resize"
-                      style={{
-                        position: 'absolute',
-                        right: -12,
-                        bottom: -12,
-                        width: 20,
-                        height: 20,
-                        background: '#2563eb',
-                        borderRadius: '50%',
-                        cursor: 'nwse-resize',
-                        border: '2px solid #fff',
-                        zIndex: 3,
-                      }}
+                      className="resize-handle"
                       onMouseDown={handleOverlayResize}
                     />
                     <div
                       data-handle="rotate"
-                      style={{
-                        position: 'absolute',
-                        left: '50%',
-                        top: -30,
-                        transform: 'translateX(-50%)',
-                        width: 20,
-                        height: 20,
-                        background: '#2563eb',
-                        borderRadius: '50%',
-                        cursor: 'grab',
-                        border: '2px solid #fff',
-                        zIndex: 3,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
+                      className="rotate-handle"
                       onMouseDown={handleOverlayRotate}
                     >
-                      <svg width="14" height="14" viewBox="0 0 14 14">
-                        <path d="M7 2a5 5 0 1 1-4.33 2.5" fill="none" stroke="#fff" strokeWidth="2" />
-                        <polyline points="7,0 7,4 11,4" fill="none" stroke="#fff" strokeWidth="2" />
+                      <svg className="rotate-icon" viewBox="0 0 14 14">
+                        <path d="M7 2a5 5 0 1 1-4.33 2.5" />
+                        <polyline points="7,0 7,4 11,4" />
                       </svg>
                     </div>
                   </div>
@@ -737,85 +645,36 @@ const PDFSigner: React.FC = () => {
 
           {/* Signature Color Panel with Action Buttons (only shown when signature is loaded) */}
           {signatureUrl && (
-            <div style={{
-              padding: '1rem',
-              background: '#383838',
-              borderRadius: '8px',
-              border: '1px solid #e9ecef',
-              minWidth: '200px',
-              display: 'flex',
-              flexDirection: 'column'
-            }}>
-              <div style={{
-                fontSize: '0.9rem',
-                fontWeight: '600',
-                marginBottom: '0.5rem',
-                color: '#fff'
-              }}>
+            <div className="signature-panel">
+              <div className="signature-panel-header">
                 📝 Signature Color Options
               </div>
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.5rem',
-                marginBottom: '1rem'
-              }}>
+              <div className="color-options">
                 {colorOptions.map((color) => (
                   <button
                     key={color.value}
                     onClick={() => handleColorChange(color.value)}
                     disabled={changingColor}
-                    style={{
-                      padding: '0.5rem 0.75rem',
-                      border: currentSignatureColor === color.value ? '2px solid #2563eb' : '1px solid #ced4da',
-                      borderRadius: '6px',
-                      background: currentSignatureColor === color.value ? '#C0C0D0' : '#1a1a1a',
-                      cursor: changingColor ? 'not-allowed' : 'pointer',
-                      fontSize: '0.8rem',
-                      fontWeight: '500',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.25rem',
-                      opacity: changingColor ? 0.3 : 1,
-                      transition: 'all 0.2s ease'
-                    }}
+                    className={`color-button ${currentSignatureColor === color.value ? 'active' : ''}`}
                     title={`Change signature to ${color.name.toLowerCase()}`}
                   >
-                    <span style={{ fontSize: '0.9rem' }}>{color.icon}</span>
+                    <span className="color-icon">{color.icon}</span>
                     {color.name}
                   </button>
                 ))}
               </div>
               
               {/* Action buttons moved here */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div className="action-buttons">
                 <button
-                  style={{ 
-                    padding: '0.5rem 1rem', 
-                    background: '#2563eb', 
-                    color: '#fff', 
-                    border: 'none', 
-                    borderRadius: 6, 
-                    fontWeight: 600, 
-                    cursor: 'pointer',
-                    fontSize: '0.9rem'
-                  }}
+                  className="action-button place-button"
                   onClick={handlePlaceSignature}
                   disabled={placing}
                 >
                   {placing ? 'Exporting...' : 'Place Signature & Export PDF'}
                 </button>
                 <button
-                  style={{ 
-                    padding: '0.5rem 1rem', 
-                    background: '#6b7280', 
-                    color: '#fff', 
-                    border: 'none', 
-                    borderRadius: 6, 
-                    fontWeight: 600, 
-                    cursor: 'pointer',
-                    fontSize: '0.9rem'
-                  }}
+                  className="action-button change-sig-button"
                   onClick={resetSignature}
                 >
                   Change Signature
@@ -826,14 +685,6 @@ const PDFSigner: React.FC = () => {
         </div>
       </>
     )}
-
-      {/* CSS Animation for loading spinner */}
-      <style>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 };

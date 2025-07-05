@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import PDFMerger from './components/PDFMerger';
 import PDFSigner from './components/PDFSigner';
-import './App.css';
+import './styles/App.css';
 
 function App() {
   const [mode, setMode] = useState<'merge' | 'sign'>('merge');
