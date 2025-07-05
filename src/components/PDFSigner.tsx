@@ -64,6 +64,40 @@ const PDFSigner: React.FC = () => {
   React.useEffect(() => { pageCanvasesRef.current = pageCanvases; }, [pageCanvases]);
   React.useEffect(() => { currentPageRef.current = currentPage; }, [currentPage]);
 
+  React.useEffect(() => {
+    const scrollContainer = document.querySelector('.pdf-viewer');
+    if (!scrollContainer) return;
+
+    const handleScroll = () => {
+      const pageContainers = document.querySelectorAll('[data-canvas-container]');
+      if (pageContainers.length === 0) return;
+
+      const scrollRect = scrollContainer.getBoundingClientRect();
+      let mostVisiblePage = -1;
+      let maxVisibility = 0;
+
+      pageContainers.forEach((page, index) => {
+        const pageRect = page.getBoundingClientRect();
+        const visibleHeight = Math.max(0, Math.min(pageRect.bottom, scrollRect.bottom) - Math.max(pageRect.top, scrollRect.top));
+        const visibility = visibleHeight / pageRect.height;
+
+        if (visibility > maxVisibility) {
+          maxVisibility = visibility;
+          mostVisiblePage = index + 1;
+        }
+      });
+
+      if (mostVisiblePage !== -1 && mostVisiblePage !== currentPageRef.current) {
+        setCurrentPage(mostVisiblePage);
+      }
+    };
+
+    scrollContainer.addEventListener('scroll', handleScroll);
+    return () => {
+      scrollContainer.removeEventListener('scroll', handleScroll);
+    };
+  }, [pageCanvases]);
+
   const handlePdfUpload = async (file: File) => {
     if (!file) return;
     if (file.type !== 'application/pdf') {
@@ -132,30 +166,28 @@ const PDFSigner: React.FC = () => {
 
     // Center the signature in the visible area of the current page
     setTimeout(() => {
-      // Find the scrollable PDF viewer container
       const scrollContainer = document.querySelector('.pdf-viewer');
-      // Find the current page's canvas container
       const pageContainers = document.querySelectorAll('[data-canvas-container]');
-      const currentPageIdx = currentPage - 1;
+      const currentPageIdx = currentPageRef.current - 1;
       const pageContainer = pageContainers[currentPageIdx] as HTMLElement | undefined;
+
       if (!scrollContainer || !pageContainer) return;
 
-      const scrollRect = (scrollContainer as HTMLElement).getBoundingClientRect();
+      const scrollRect = scrollContainer.getBoundingClientRect();
       const pageRect = pageContainer.getBoundingClientRect();
-      // Calculate visible area of the page within the scroll container
+
       const visibleTop = Math.max(scrollRect.top, pageRect.top);
       const visibleBottom = Math.min(scrollRect.bottom, pageRect.bottom);
       const visibleLeft = Math.max(scrollRect.left, pageRect.left);
       const visibleRight = Math.min(scrollRect.right, pageRect.right);
 
-      // Calculate center of the visible area relative to the page
       const centerX = (visibleLeft + visibleRight) / 2 - pageRect.left;
       const centerY = (visibleTop + visibleBottom) / 2 - pageRect.top;
-      // Use sigSize from state
+
       const size = sigSizeRef.current || 120;
-      // Adjust so signature is centered
       const newX = Math.max(0, Math.min(pageRect.width - size, centerX - size / 2));
       const newY = Math.max(0, Math.min(pageRect.height - size, centerY - size / 2));
+
       setSigPos({ x: newX, y: newY });
     }, 0);
   };
@@ -289,8 +321,14 @@ const PDFSigner: React.FC = () => {
           setCurrentPageRef.current(i + 1);
         }
         
+        const sigImg = sigImgRef.current;
+        if (!sigImg) return;
+
+        const aspectRatio = sigImg.naturalHeight / sigImg.naturalWidth;
+        const sigHeight = sigSize * aspectRatio;
+
         const newX = Math.max(0, Math.min(pageRect.width - sigSize, localX));
-        const newY = Math.max(0, Math.min(height - sigSize, localY));
+        const newY = Math.max(0, Math.min(height - sigHeight, localY));
         
         setSigPosRef.current({ x: newX, y: newY });
         return;
