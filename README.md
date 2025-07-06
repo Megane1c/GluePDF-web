@@ -34,6 +34,7 @@ The server will start on port 5173 by default.
 - `sigColorChanger.ts`: Handles signature color change.
 - `PDFMerger.tsx`: Manages drag-and-drop, merge workflow, and error states.
 - `PDFList.tsx`: Optimized sortable list with filename truncation and size formatting.
+- `PDFEditor.tsx`: Add, move, and style text boxes on PDF (basic editing UI).
 
 ## Project Structure
 - `public/` - Static assets
@@ -42,6 +43,6 @@ The server will start on port 5173 by default.
 - `src/services/` - PDF processing logic (merge, validation, sign)
 - `App.tsx` - Root component
 - `main.tsx` - React + Vite entry point
-- `App.css`, `index.css` - Component and global styles
+- `src/styles` - Component and global styles
 - `index.html` - HTML template used by Vite
 - `README.md` - Project documentation (this file)
