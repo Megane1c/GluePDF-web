@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import PDFMerger from './components/PDFMerger';
 import PDFSigner from './components/PDFSigner';
+import PDFEditor from './components/PDFEditor';
 import './styles/App.css';
 
 function App() {
-  const [mode, setMode] = useState<'merge' | 'sign'>('merge');
+  const [mode, setMode] = useState<'merge' | 'sign' | 'edit'>('merge');
 
   return (
     <main>
@@ -23,8 +24,15 @@ function App() {
         >
           Sign PDF
         </button>
+        <button
+          className={`menu-btn${mode === 'edit' ? ' active' : ''}`}
+          onClick={() => setMode('edit')}
+          type="button"
+        >
+          Edit PDF
+        </button>
       </header>
-      {mode === 'merge' ? <PDFMerger /> : <PDFSigner />}
+      {mode === 'merge' ? <PDFMerger /> : mode === 'sign' ? <PDFSigner /> : <PDFEditor />}
     </main>
   );
 }
